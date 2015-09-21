@@ -17,22 +17,49 @@ namespace LibSequentia.Data
 
 	public partial class Section
 	{
+		static Automation[] TestAutomation()
+		{
+			var tenauto1			= new Automation();
+			tenauto1.targetParam	= Automation.TargetParam.Volume;
+			tenauto1.AddPoint(0, 0);
+			tenauto1.AddPoint(0.75f, 1);
+
+			var tenauto2			= new Automation();
+			tenauto2.targetParam	= Automation.TargetParam.Volume;
+			tenauto2.AddPoint(0, 0);
+			tenauto2.AddPoint(0.25f, 0);
+			tenauto2.AddPoint(0.5f, 1);
+
+			var tenauto3			= new Automation();
+			tenauto3.targetParam	= Automation.TargetParam.Volume;
+			tenauto3.AddPoint(0, 0);
+			tenauto3.AddPoint(0.5f, 0);
+			tenauto3.AddPoint(1f, 1);
+
+			return new Automation[] { tenauto1, tenauto2, tenauto3 };
+		}
+
 		public static Section GenTestSection1(IAudioClipPack clipPack)
 		{
 			var section	= new Section();
 
 			// BPM:120, 4/4 -> 1bar = 4beat
 
+			var automations		= TestAutomation();
+
 			var layer1			= Layer.GenTestLayer(clipPack.GetHandle("test-sec1-1"));
 			section.m_layers[0]	= layer1;
 
 			var layer2			= Layer.GenTestLayer(clipPack.GetHandle("test-sec1-2"));
+			layer2.AddTensionAutomation(automations[1]);
 			section.m_layers[1]	= layer2;
 
 			var layer3			= Layer.GenTestLayer(clipPack.GetHandle("test-sec1-3"));
+			layer3.AddTensionAutomation(automations[0]);
 			section.m_layers[2]	= layer3;
 
 			var layer4			= Layer.GenTestLayer(clipPack.GetHandle("test-sec1-4"));
+			layer4.AddTensionAutomation(automations[2]);
 			section.m_layers[3]	= layer4;
 
 			section.inTypeNatural	= InType.KickIn;
@@ -54,16 +81,21 @@ namespace LibSequentia.Data
 
 			// BPM:120, 4/4 -> 1bar = 4beat
 
+			var automations		= TestAutomation();
+
 			var layer1			= Layer.GenTestLayer(clipPack.GetHandle("test-sec2-1"));
 			section.m_layers[0]	= layer1;
 
 			var layer2			= Layer.GenTestLayer(clipPack.GetHandle("test-sec2-2"));
+			layer2.AddTensionAutomation(automations[1]);
 			section.m_layers[1]	= layer2;
 
 			var layer3			= Layer.GenTestLayer(clipPack.GetHandle("test-sec2-3"));
+			layer3.AddTensionAutomation(automations[0]);
 			section.m_layers[2]	= layer3;
 
 			var layer4			= Layer.GenTestLayer(clipPack.GetHandle("test-sec2-4"));
+			layer4.AddTensionAutomation(automations[2]);
 			section.m_layers[3]	= layer4;
 
 			section.inTypeNatural	= InType.KickIn;

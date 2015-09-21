@@ -42,6 +42,23 @@ namespace LibSequentia.Engine
 			get { return m_secplayer[(m_secPlayerIdx+1)%2]; }
 		}
 
+		float						m_tension;
+		/// <summary>
+		/// 긴장도 (텐션)
+		/// </summary>
+		public float tension
+		{
+			get { return m_tension; }
+			set
+			{
+				m_tension	= value;
+				for(int i = 0; i < c_playerCount; i++)
+				{
+					m_secplayer[i].tension	= m_tension;
+				}
+			}
+		}
+
 
 
 		public TrackPlayer(MonoBehaviour context)
