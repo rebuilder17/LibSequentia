@@ -38,10 +38,24 @@ namespace LibSequentia.Data
 				float ratio			= reverseTransition? (1.0f - value) : value;
 
 				if (m_introAutoTarget != null)
-					m_introAutoTarget.Set(ratio, m_introAutomations);
+				{
+					int count	= m_introAutomations.Count;
+					for(int i = 0; i < count; i++)
+					{
+						var auto	= m_introAutomations[i];
+						m_introAutoTarget.Set(auto.targetParam, auto.GetValue(value));
+					}
+				}
 
 				if (m_outroAutoTarget != null)
-					m_outroAutoTarget.Set(ratio, m_outroAutomations);
+				{
+					int count	= m_outroAutomations.Count;
+					for(int i = 0; i < count; i++)
+					{
+						var auto	= m_outroAutomations[i];
+						m_outroAutoTarget.Set(auto.targetParam, auto.GetValue(value));
+					}
+				}
 			}
 		}
 	}

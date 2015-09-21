@@ -27,7 +27,14 @@ namespace LibSequentia.Data
 			{
 				m_tension	= value;
 				if (m_autoTarget != null)
-					m_autoTarget.Set(value, m_tensionAutomations);
+				{
+					int count	= m_tensionAutomations.Count;
+					for(int i = 0; i < count; i++)
+					{
+						var automation	= m_tensionAutomations[i];
+						m_autoTarget.Set(automation.targetParam, automation.GetValue(value));
+					}
+				}
 			}
 		}
 

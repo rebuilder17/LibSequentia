@@ -98,6 +98,30 @@ namespace LibSequentia.Engine
 			m_playerComponentIndex = (m_playerComponentIndex+1) % c_playerComponentsCount;
 		}
 
+		Data.IAutomationControl m_transitionAutomationTarget;	// 섹션 전환시 오토메이션 타겟
+		Data.IAutomationControl [] m_tensionAutomationTargets;
+
+
+		public float		m_tension	= 0;
+
+		/// <summary>
+		/// 긴장도.
+		/// </summary>
+		public float tension
+		{
+			get { return m_tension; }
+			set
+			{
+				m_tension	= value;
+				if (m_sectionData != null)
+				{
+					m_sectionData.tension	= m_tension;
+				}
+			}
+		}
+
+
+
 		/// <summary>
 		/// 실제 재생 전이거나 루프가 끝난 경우 true
 		/// </summary>
@@ -141,6 +165,16 @@ namespace LibSequentia.Engine
 			m_playerComponents[1] = p2;
 		}
 
+		public void SetTransitionAutomationTarget(Data.IAutomationControl ctrl)
+		{
+			m_transitionAutomationTarget	= ctrl;
+		}
+
+		public void SetTensionAutomationTargets(params Data.IAutomationControl [] ctrls)
+		{
+			m_tensionAutomationTargets	= ctrls;
+		}
+
 
 		/// <summary>
 		/// 현재 section의 정보 (layer 등등)을 현재 플레이어에 세팅
@@ -179,7 +213,18 @@ namespace LibSequentia.Engine
 			m_endTransition		= TransitionType.None;
 			isOnTransition		= false;
 			
-			section.tension		= 0;
+
+			// 텐션 관련 설정
+			for (int i = 0; i < Data.Section.c_maxLayerPerSection; i++)
+			{
+				var layer		= section.GetLayer(i);
+				if (layer != null)
+				{
+					layer.SetAutomationTarget(m_tensionAutomationTargets[i]);
+				}
+			}
+			section.tension		= m_tension;
+
 
 			if (startTime == 0)											// 시작 시간이 지정되지 않은 경우 다음 안전한 비트를 시작 시간으로
 			{
@@ -243,21 +288,63 @@ namespace LibSequentia.Engine
 			m_state			= State.BeforeFillIn;
 			//Debug.Log(m_state.ToString() + " ... dspTime : " + AudioSettings.dspTime);
 
-			// TODO : 자연 전환 오토메이션
 
-			while (AudioSettings.dspTime < timeFillIn)			// Fill-in 지점까지 대기
-				yield return null;
+			var auto	= GetAutomation(m_startTransition == TransitionType.Manual? m_sectionData.inTypeManual : m_sectionData.inTypeNatural);
 
+			if (m_startTransition == TransitionType.Natural)	// 자연 전환일 경우 여기에서 트랜지션
+			{
+				while (AudioSettings.dspTime < timeFillIn)
+				{
+					if (auto != null)
+					{
+						var t	= (AudioSettings.dspTime - timePlay) / (timeLoopStart - timePlay);
+						m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue((float)t));
+						//Debug.LogFormat("t = {0}, value = {1}", t, auto.GetValue((float)t));
+					}
+					yield return null;
+				}
+			}
+			else
+			{
+				while (AudioSettings.dspTime < timeFillIn)		// Fill-in 지점까지 대기
+					yield return null;
+			}
+			
 
 			// *** Fill - in
 
 			m_state				= State.FillIn;
 			//Debug.Log(m_state.ToString() + " ... dspTime : " + AudioSettings.dspTime);
 
-			// TODO : 강제 전환 오토메이션
-
-			while (AudioSettings.dspTime < timeLoopStart)		// 루프 시작 지점까지 대기
-				yield return null;
+			
+			if (m_startTransition == TransitionType.Natural)	// 자연 전환일 경우, 루프 시작까지 남은 부분에 대해서 전환
+			{
+				while (AudioSettings.dspTime < timeLoopStart)
+				{
+					if (auto != null)
+					{
+						var t	= (AudioSettings.dspTime - timePlay) / (timeLoopStart - timePlay);
+						m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue((float)t));
+						//Debug.LogFormat("t = {0}, value = {1}", t, auto.GetValue((float)t));
+					}
+					yield return null;
+				}
+				m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue(1));	// 마지막 값으로 보정
+			}
+			else
+			{													// 강제 전환
+				while (AudioSettings.dspTime < timeLoopStart)
+				{
+					if (auto != null)
+					{
+						var t	= (AudioSettings.dspTime - timeFillIn) / (timeLoopStart - timeFillIn);
+						m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue((float)t));
+						//Debug.LogFormat("t = {0}, value = {1}", t, auto.GetValue((float)t));
+					}
+					yield return null;
+				}
+				m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue(1));	// 마지막 값으로 보정
+			}
 
 
 			// *** Looping
@@ -267,41 +354,6 @@ namespace LibSequentia.Engine
 			m_suppressLooping	= false;								// 루프 억제 여부
 			while(true)													// fadeout 설정이 되지 않는다면 계속 루프한다.
 			{
-			//	//
-			//	// FadeOut 기능 사용시
-			//	//
-			//	if (m_endTransition == TransitionType.Natural)			// * 자연 진행 설정
-			//	{
-			//		var transitionStart	= nextLoopEndDspTime - m_endTransitionLength;
-			//		while (AudioSettings.dspTime < transitionStart)		// 트랜지션 시작 시간까지 대기
-			//			yield return null;
-
-			//		// TODO : 트랜지션
-
-			//		while (AudioSettings.dspTime < nextLoopEndDspTime)	// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
-			//			yield return null;
-
-			//		break;
-			//	}
-			//	else if (m_endTransition == TransitionType.Manual)		// * 강제 진행 설정
-			//	{
-			//		// TODO : 이렇게 하면 BPM이 다른 트랙끼리는 동작이 이상할 수도 있다...?
-			//		var transitionStart	= m_clock.CalcNextSafeBeatTime();
-			//		var transitionEnd	= transitionStart + m_endTransitionLength;
-
-			//		while (AudioSettings.dspTime < transitionStart)		// 트랜지션 시작 시간까지 대기
-			//			yield return null;
-
-			//		while (AudioSettings.dspTime < transitionEnd)		// 트랜지션 끝까지 대기
-			//			yield return null;
-
-			//		currentPlayerComponent.StopImmediately();			// 음원 바로 중지 후 루프 종료
-			//		break;
-			//	}
-
-				//
-				// 일반 루프
-				//
 				var nextSafeBeat	= m_clock.CalcNextSafeBeatTime();
 				if (System.Math.Abs(nextSafeBeat - nextLoopEndDspTime) < beatTime
 												&& !m_loopReserved && !m_suppressLooping)	// 다음번 비트에 루프를 해야하는 경우
@@ -333,14 +385,6 @@ namespace LibSequentia.Engine
 					nextLoopEndDspTime	+= m_loopLengthDspTime;						// 다음 루프 시간 지정
 				}
 			}
-
-
-			//// 루프 종료.
-
-			//m_state = State.AfterLoop;
-
-			//while (true)				// 마지막 스테이트에서 계류
-			//	yield return null;
 		}
 
 		/// <summary>
@@ -413,12 +457,17 @@ namespace LibSequentia.Engine
 
 			m_suppressLooping	= true;							// 새 루프가 시작되지 못하도록 한다.
 
-			
-
-			// TODO : 트랜지션
-
+			var automation	= GetAutomation(m_sectionData.outTypeNatural);
 			while (AudioSettings.dspTime < nextLoopEndDspTime)	// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
+			{
+				if (automation != null)							// 오토메이션 적용
+				{
+					var t	= (AudioSettings.dspTime - transitionStart) / (nextLoopEndDspTime - transitionStart);
+					m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue((float)t));
+				}
 				yield return null;
+			}
+			m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue(1));	// 마지막 값으로 보정
 
 			isOnTransition		= false;						// 실제 트랜지션 종료
 			Debug.Log("Natural Transition End dspTime" + AudioSettings.dspTime);
@@ -443,9 +492,18 @@ namespace LibSequentia.Engine
 			isOnTransition		= true;							// 실제 트랜지션 시작
 			Debug.Log("Manual Transition Start dspTime" + AudioSettings.dspTime);
 
-
-			while (AudioSettings.dspTime < transitionEnd)		// 트랜지션 끝까지 대기
+			var automation	= GetAutomation(m_sectionData.outTypeManual);
+			while (AudioSettings.dspTime < transitionEnd)		// 트랜지션 끝까지 반복, 오토메이션 적용
+			{
+				if (automation != null)
+				{
+					var t	= (AudioSettings.dspTime - transitionStart) / (transitionEnd - transitionStart);
+					m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue((float)t));
+					//Debug.Log(string.Format("out transition value : {0} at t = {1}", automation.GetValue((float)t), t));
+				}
 				yield return null;
+			}
+			m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue(1));	// 마지막 값으로 보정
 
 			isOnTransition		= false;						// 실제 트랜지션 종료
 			Debug.Log("Natural Transition End dspTime" + AudioSettings.dspTime);
@@ -455,6 +513,43 @@ namespace LibSequentia.Engine
 			m_context.StopCoroutine(m_updateCo);
 
 			m_state		= State.AfterLoop;
+		}
+
+
+
+
+
+		static Data.Automation GetAutomation(Data.Section.InType intype)
+		{
+			Data.Automation	auto	= null;
+			switch(intype)
+			{
+				case Data.Section.InType.FadeIn:
+					auto	= Data.Automation.LinearFadeIn;
+					break;
+				case Data.Section.InType.KickIn:
+					auto	= Data.Automation.InstantUnMute;
+					break;
+			}
+			return auto;
+		}
+
+		static Data.Automation GetAutomation(Data.Section.OutType outtype)
+		{
+			Data.Automation	auto	= null;
+			switch(outtype)
+			{
+				case Data.Section.OutType.FadeOut:
+					auto	= Data.Automation.LinearFadeOut;
+					break;
+				case Data.Section.OutType.Mute:
+					auto	= Data.Automation.InstantMute;
+					break;
+				case Data.Section.OutType.LeaveIt:
+					auto	= Data.Automation.InstantUnMute;
+					break;
+			}
+			return auto;
 		}
 	}
 }

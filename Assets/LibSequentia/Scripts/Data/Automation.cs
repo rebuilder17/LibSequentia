@@ -10,13 +10,13 @@ namespace LibSequentia.Data
 	/// </summary>
 	public interface IAutomationControl
 	{
-		void Set(float timeRatio, ICollection<Automation> data);
+		void Set(Automation.TargetParam param, float value);
 	}
 
 	/// <summary>
 	/// 파라미터 오토메이션에 관한 정보
 	/// </summary>
-	public class Automation
+	public partial class Automation
 	{
 		/// <summary>
 		/// 오토메이션 타겟 목록
@@ -125,12 +125,19 @@ namespace LibSequentia.Data
 			if (i2 == -1)
 				throw new System.InvalidOperationException("Automation data is empty");
 
-			// 두 점 사이의 비율만큼 선형 보간해서 데이터 리턴
-			var p1			= m_data[i1];
-			var p2			= m_data[i2];
-			var rbetween	= (timeRatio - p1.timeRatio) / (p2.timeRatio - p1.timeRatio);
+			if (i1 != i2)
+			{
+				// 두 점 사이의 비율만큼 선형 보간해서 데이터 리턴
+				var p1			= m_data[i1];
+				var p2			= m_data[i2];
+				var rbetween	= (timeRatio - p1.timeRatio) / (p2.timeRatio - p1.timeRatio);
 
-			return p1.value + (p2.value - p1.value) * rbetween;
+				return p1.value + (p2.value - p1.value) * Mathf.Clamp01(rbetween);
+			}
+			else
+			{
+				return m_data[i2].value;
+			}
 		}
 	}
 }
