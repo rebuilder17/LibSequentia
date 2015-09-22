@@ -59,6 +59,38 @@ namespace LibSequentia.Engine
 			}
 		}
 
+		/// <summary>
+		/// 현재 재생중인지
+		/// </summary>
+		public bool isPlaying
+		{
+			get { return !m_secplayer[0].isReadyOrFinished && !m_secplayer[1].isReadyOrFinished; }
+		}
+
+		/// <summary>
+		/// 현재 재생중인 섹션 인덱스
+		/// </summary>
+		public int currentSectionIndex
+		{
+			get { return m_sectionIdx; }
+		}
+
+		/// <summary>
+		/// 총 섹션 갯수
+		/// </summary>
+		public int sectionCount
+		{
+			get { return m_track.sectionCount; }
+		}
+
+		/// <summary>
+		/// 현재 사용중인 비트 싱크 클락을 가져온다.
+		/// </summary>
+		public BeatSyncClock clock
+		{
+			get { return m_clock; }
+		}
+
 
 
 		public TrackPlayer(MonoBehaviour context)
