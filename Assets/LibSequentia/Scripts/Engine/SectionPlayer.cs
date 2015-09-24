@@ -47,6 +47,8 @@ namespace LibSequentia.Engine
 			Natural	= 0,		// 자연 전환
 			Manual,				// 강제 전환
 
+			Instant,			// 즉시 전환. 오로지 StartSection에서만 사용 가능
+
 			None	= -1,		// 지정되지 않음
 		}
 
@@ -271,6 +273,14 @@ namespace LibSequentia.Engine
 				timeLoopStart	-= offset;
 				timeNextLoopEnd	-= offset;
 			}
+			else if (m_startTransition == TransitionType.Instant)
+			{
+				offset			= timeLoopStart - timePlay;
+
+				timeFillIn		-= offset;						// 시간값들 조정
+				timeLoopStart	-= offset;
+				timeNextLoopEnd	-= offset;
+			}
 			curplayer.PlayScheduled(timePlay, offset);			// 다음번 비트에 음원 재생
 
 
@@ -431,6 +441,8 @@ namespace LibSequentia.Engine
 				case TransitionType.Manual:
 					m_transitionCo	= m_context.StartCoroutine(TransitionCo_Manual());
 					break;
+				default:
+					throw new System.InvalidOperationException("wrong transition type : " + outtype);
 			}
 
 			return m_properNextSectionStartTime;
@@ -439,9 +451,11 @@ namespace LibSequentia.Engine
 		IEnumerator TransitionCo_Natural()
 		{
 			var transitionStart	= nextLoopEndDspTime - m_endTransitionLength;
+			var transitionEnd	= nextLoopEndDspTime;
 			if (transitionStart <= AudioSettings.dspTime)		// 적당한 트랜지션 시작 시간이 이미 지나버린 경우, 다음 루프때 시도해야 한다.
 			{
 				transitionStart	+= m_loopLengthDspTime;
+				transitionEnd	+= m_loopLengthDspTime;
 			}
 
 			m_properNextSectionStartTime	= transitionStart;	// 다음 섹션 시작 시간 결과값
@@ -450,19 +464,23 @@ namespace LibSequentia.Engine
 			Debug.Log("current dspTime : " + AudioSettings.dspTime + ", transitionStart : " + transitionStart);
 
 			while (AudioSettings.dspTime < transitionStart)		// 트랜지션 시작 시간까지 대기
+			{
+				// FIX : 이번 회차에 루프를 끝내야 하는 경우 루프 중지 플래그를 올린다.
+				if (!m_suppressLooping && transitionStart - AudioSettings.dspTime < m_loopLengthDspTime)
+					m_suppressLooping	= true;
+
 				yield return null;
+			}
 
 			isOnTransition		= true;							// 실제 트랜지션 시작
 			Debug.Log("Natural Transition Start dspTime" + AudioSettings.dspTime);
 
-			m_suppressLooping	= true;							// 새 루프가 시작되지 못하도록 한다.
-
 			var automation	= GetAutomation(m_sectionData.outTypeNatural);
-			while (AudioSettings.dspTime < nextLoopEndDspTime)	// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
+			while (AudioSettings.dspTime < transitionEnd)	// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
 			{
 				if (automation != null)							// 오토메이션 적용
 				{
-					var t	= (AudioSettings.dspTime - transitionStart) / (nextLoopEndDspTime - transitionStart);
+					var t	= (AudioSettings.dspTime - transitionStart) / (transitionEnd - transitionStart);
 					m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue((float)t));
 				}
 				yield return null;
@@ -470,6 +488,7 @@ namespace LibSequentia.Engine
 			m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue(1));	// 마지막 값으로 보정
 
 			isOnTransition		= false;						// 실제 트랜지션 종료
+			m_endTransition		= TransitionType.None;
 			Debug.Log("Natural Transition End dspTime" + AudioSettings.dspTime);
 
 
@@ -506,6 +525,7 @@ namespace LibSequentia.Engine
 			m_transitionAutomationTarget.Set(automation.targetParam, automation.GetValue(1));	// 마지막 값으로 보정
 
 			isOnTransition		= false;						// 실제 트랜지션 종료
+			m_endTransition		= TransitionType.None;
 			Debug.Log("Natural Transition End dspTime" + AudioSettings.dspTime);
 
 			currentPlayerComponent.StopImmediately();			// 음원 바로 중지 후 루프 종료

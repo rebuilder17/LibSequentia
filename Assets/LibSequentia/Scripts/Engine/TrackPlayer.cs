@@ -26,6 +26,7 @@ namespace LibSequentia.Engine
 
 		Track						m_track;
 		int							m_sectionIdx	= 0;
+		bool						m_suppressProgress	= false;	// 더 이상의 섹션 진행을 막는다.
 
 		void SwitchPlayer()
 		{
@@ -64,7 +65,8 @@ namespace LibSequentia.Engine
 		/// </summary>
 		public bool isPlaying
 		{
-			get { return !m_secplayer[0].isReadyOrFinished && !m_secplayer[1].isReadyOrFinished; }
+			// 둘 중 하나라도 재생중이라면 true
+			get { return !m_secplayer[0].isReadyOrFinished || !m_secplayer[1].isReadyOrFinished; }
 		}
 
 		/// <summary>
@@ -131,6 +133,7 @@ namespace LibSequentia.Engine
 		{
 			m_track				= track;
 			m_sectionIdx		= -1;
+			m_suppressProgress	= false;
 
 			if (clockToSync == null)								// 클럭이 지정되지 않은 경우, 새로 생성
 			{
@@ -149,19 +152,32 @@ namespace LibSequentia.Engine
 		/// <summary>
 		/// 자연 진행
 		/// </summary>
+		/// <param name="suppressProgress">현재 섹션을 마지막으로 재생을 멈춘다.</param>
 		/// <returns>transition이 발생할 시간. transition을 할 수 없었던 경우 -1 리턴</returns>
-		public double DoNaturalProgress()
+		public double DoNaturalProgress(bool suppressProgress = false)
 		{
+			m_suppressProgress	= suppressProgress;
 			return DoProgress(SectionPlayer.TransitionType.Natural);
 		}
 
 		/// <summary>
 		/// 강제 진행
 		/// </summary>
+		/// <param name="suppressProgress">현재 섹션을 마지막으로 재생을 멈춘다.</param>
 		/// <returns>transition이 발생할 시간. transition을 할 수 없었던 경우 -1 리턴</returns>
-		public double DoManualProgress()
+		public double DoManualProgress(bool suppressProgress = false)
 		{
+			m_suppressProgress	= suppressProgress;
 			return DoProgress(SectionPlayer.TransitionType.Manual);
+		}
+
+		/// <summary>
+		/// 즉시 진행. 최초 플레이시에만 가능하다
+		/// </summary>
+		/// <returns></returns>
+		public double DoInstantProgress()
+		{
+			return DoProgress(SectionPlayer.TransitionType.Instant);
 		}
 
 		double DoProgress(SectionPlayer.TransitionType ttype)
@@ -178,19 +194,7 @@ namespace LibSequentia.Engine
 
 			// 트랜지션 시간 구하기
 
-			int trbeats				= 4;
-			if (m_sectionIdx < m_track.sectionCount)			// 다음에 올 섹션이 있다면 해당 섹션의 앞쪽 부분을 기준으로 계산
-			{
-				var nextsec			= m_track.GetSection(m_sectionIdx);
-				trbeats				= nextsec.beatStart;
-
-				if (ttype == SectionPlayer.TransitionType.Manual)	// 강제 전환은 fillin 앞부분이 잘림
-				{
-					trbeats			-= nextsec.beatFillIn;
-				}
-			}
-
-			double transitionTime	= m_clock.CalcBeatTimeLength(trbeats);
+			double transitionTime	= CalcSectionTransitionTimeLength(m_sectionIdx, ttype);
 
 
 
@@ -202,8 +206,7 @@ namespace LibSequentia.Engine
 			if (!sidePlayer.isOnTransition
 				&& (int)ttype > (int)sidePlayer.currentEndTransition)
 			{
-				
-				if(m_sectionIdx > 0)
+				if(m_sectionIdx > 0 && !m_suppressProgress)	// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
 				{
 					newSectionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
 				}
@@ -218,8 +221,44 @@ namespace LibSequentia.Engine
 					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, newSectionStart);
 				}
 			}
+			else
+			{
+				Debug.Log(string.Format("sidePlayer.isOnTransition : {0}, sidePlayer.currentEndTransition : {1}", sidePlayer.isOnTransition, sidePlayer.currentEndTransition));
+			}
 
 			return newSectionStart;
+		}
+
+		/// <summary>
+		/// 특정 세션이 전환되어 들어올 때 걸리는 시간을 계산
+		/// </summary>
+		/// <param name="sectionindex"></param>
+		/// <param name="ttype"></param>
+		/// <returns></returns>
+		public double CalcSectionTransitionTimeLength(int sectionindex, SectionPlayer.TransitionType ttype)
+		{
+			int trbeats				= 4;
+			if (sectionindex < m_track.sectionCount)				// 다음에 올 섹션이 있다면 해당 섹션의 앞쪽 부분을 기준으로 계산
+			{
+				var nextsec			= m_track.GetSection(sectionindex);
+				trbeats				= nextsec.beatStart;
+
+				if (ttype == SectionPlayer.TransitionType.Manual)	// 강제 전환은 fillin 앞부분이 잘림
+				{
+					trbeats			-= nextsec.beatFillIn;
+				}
+			}
+
+			return m_clock.CalcBeatTimeLength(trbeats);
+		}
+
+		/// <summary>
+		/// 재생 즉시 모두 정지
+		/// </summary>
+		public void StopImmediately()
+		{
+			currentPlayer.EndSection();
+			sidePlayer.EndSection();
 		}
 	}
 }

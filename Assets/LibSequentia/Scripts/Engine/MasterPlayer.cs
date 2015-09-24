@@ -32,6 +32,18 @@ namespace LibSequentia.Engine
 			public object	parameter;
 		}
 
+		/// <summary>
+		/// 플레이어 상태
+		/// </summary>
+		enum State
+		{
+			NotPlaying,					// 아무 트랙도 재생중이지 않음
+			PlayingOneSide,				// 한쪽에서만 재생중
+			TransitionReady,			// 다른 트랙 재생 준비됨
+			OnTransition,				// 트랜지션 진행중
+			TransitionFinish,			// 트랜지션 완료
+		}
+
 
 
 		// Members
@@ -65,6 +77,18 @@ namespace LibSequentia.Engine
 		public double lastCalculatedTransitionTime { get; private set; }
 
 		bool					m_newTrackReady;						// 새로 재생할 (트랜지션할) 트랙이 준비되어있는지 여부
+		bool					m_transitionReserved;					// 전환 효과 예약되었는지 여부
+		SectionPlayer.TransitionType m_transitionType;					// 전환 타입
+		State					m_state;								// 현재 플레이어 상태
+
+		public float tension
+		{
+			set
+			{
+				m_trackPlayer[0].tension	= value;
+				m_trackPlayer[1].tension	= value;
+			}
+		}
 
 
 
@@ -72,8 +96,15 @@ namespace LibSequentia.Engine
 
 		public MasterPlayer(MonoBehaviour context)
 		{
+			m_state		= State.NotPlaying;
 			m_context	= context;
 			context.StartCoroutine(UpdateCo());
+		}
+
+		public void SetTrackPlayers(TrackPlayer p1, TrackPlayer p2)
+		{
+			m_trackPlayer[0]	= p1;
+			m_trackPlayer[1]	= p2;
 		}
 
 		public void DoNaturalProgress()
@@ -106,7 +137,11 @@ namespace LibSequentia.Engine
 						consume		= (trtime >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
+						{
 							lastCalculatedTransitionTime = trtime;
+							m_transitionType		= SectionPlayer.TransitionType.Manual;
+							m_transitionReserved	= true;
+						}
 					}
 					break;
 
@@ -116,7 +151,11 @@ namespace LibSequentia.Engine
 						consume		= (trtime >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
+						{
 							lastCalculatedTransitionTime = trtime;
+							m_transitionType		= SectionPlayer.TransitionType.Natural;
+							m_transitionReserved	= true;
+						}
 					}
 					break;
 
@@ -143,28 +182,161 @@ namespace LibSequentia.Engine
 			return consume;
 		}
 
+		/// <summary>
+		/// 스테이트 - 아무것도 재생중이지 않을 때
+		/// </summary>
+		private void ProcessState_NotPlaying()
+		{
+			if (m_newTrackReady)					// 새 트랙이 올라왔다면 바로 처리해준다
+			{
+				m_newTrackReady	= false;
+
+				SwitchPlayer();
+			}
+			
+			if (m_transitionReserved)				// 트랜지션 시작 => 첫 재생임
+			{
+				m_state			= State.PlayingOneSide;
+			}
+		}
+
+		/// <summary>
+		/// 스태이트 - 한 쪽에서만 재생중
+		/// </summary>
+		private void ProcessState_PlayngOneSide()
+		{
+			if (m_transitionReserved)					// 트랜지션 예약되었을 시
+			{
+				if (m_newTrackReady)					// 새 트랙이 대기중이라면
+				{
+					var newclock	= sidePlayer.clock;
+					var nextbeat	= newclock.CalcNextSafeBeatTime();
+					if (lastCalculatedTransitionTime - nextbeat < newclock.SecondPerBeat)	// 다음 비트에 트랜지션이 온다면 새 트랙 재생 시작
+					{
+						SwitchPlayer();
+						currentPlayer.DoInstantProgress();									// fill-in 부분을 생략하고 즉시 재생을 한다.
+
+						m_state					= State.TransitionReady;					// 스테이트 변화
+
+						m_newTrackReady			= false;
+						m_transitionReserved	= false;
+
+						// TODO : TransitionScenario 준비
+					}
+				}
+				else
+				{
+					if (AudioSettings.dspTime >= lastCalculatedTransitionTime)				// 별 일 없이 트랜지션 시간을 지나는 경우에 플래그를 꺼준다.
+					{
+						m_transitionReserved	= false;
+						m_state					= State.PlayingOneSide;
+					}
+				}
+			}
+			else if (!currentPlayer.isPlaying && !sidePlayer.isPlaying)						// 트랜지션중이 아닌데 플레이중도 아니라면, notplaying 스테이트로
+			{
+				Debug.Log(string.Format("current player playing : {0}, side player playing : {1}", currentPlayer.isPlaying, sidePlayer.isPlaying));
+				m_state	= State.NotPlaying;
+			}
+		}
+		/// <summary>
+		/// 스테이트 - 트랜지션 대기
+		/// </summary>
+		private void ProcessState_TransitionReady()
+		{
+			if (AudioSettings.dspTime >= lastCalculatedTransitionTime)					// 트랜지션 시간이 되었다면 본격적인 트랜지션 상태로
+			{
+				m_state		= State.OnTransition;
+				
+				// TODO : TransitionScenario 적용
+			}
+		}
+
+		/// <summary>
+		/// 스테이트 - 트랜지션중
+		/// </summary>
+		private void ProcessState_OnTransition()
+		{
+			if (m_transitionReserved)					// 트랜지션 예약되었을 시
+			{
+				var clock		= currentPlayer.clock;
+				var nextbeat	= clock.CalcNextSafeBeatTime();
+				if (lastCalculatedTransitionTime - nextbeat < clock.SecondPerBeat)		// 다음 비트에 트랜지션한다면
+				{
+					m_transitionReserved	= false;
+					m_state					= State.TransitionFinish;
+				}
+			}
+		}
+
+		/// <summary>
+		/// 스테이트 - 트랜지션 완료
+		/// </summary>
+		private void ProcessState_TransitionFinish()
+		{
+			if (AudioSettings.dspTime >= lastCalculatedTransitionTime)					// 트랜지션 시간이 되었다면 트랜지션 완전 마무리
+			{
+				m_state	= State.PlayingOneSide;
+
+				// TODO : TransitionScenario 끝내기
+			}
+		}
+
+		State __oldstate;
 		IEnumerator UpdateCo()
 		{
 			while (true)
 			{
 				// 메세지 큐 처리
-				while (m_msgQueue.Count > 0)
+				if (m_msgQueue.Count > 0)
 				{
 					var msg	= m_msgQueue.Peek();
 
 					if (ProcessMessage(ref msg))		// 메세지를 정상적으로 처리하면 큐에서 삭제
 					{
+						Debug.Log(msg.type.ToString() + " message consumed");
 						m_msgQueue.Dequeue();
 					}
 					else
-					{									// 처리하지 못한 경우엔 큐에 존속시킨 채로 루프 빠져나오기
-						break;
+					{
+						Debug.Log(msg.type.ToString() + " message not consumed...");
+						yield return null;
 					}
 				}
+				else
+				{
+					yield return null;
+				}
 
+				if (__oldstate != m_state)
+				{
+					Debug.Log("state changed : " + m_state);
+					__oldstate = m_state;
+				}
 
+				// 현재 스테이트에 맞는 처리
+				switch(m_state)
+				{
+					case State.NotPlaying:
+						ProcessState_NotPlaying();
+						break;
 
-				yield return null;
+					case State.PlayingOneSide:
+						ProcessState_PlayngOneSide();
+						break;
+
+					case State.TransitionReady:
+						ProcessState_TransitionReady();
+						break;
+
+					case State.OnTransition:
+						ProcessState_OnTransition();
+						break;
+
+					case State.TransitionFinish:
+						ProcessState_TransitionFinish();
+						break;
+				}
 			}
 		}
 	}
