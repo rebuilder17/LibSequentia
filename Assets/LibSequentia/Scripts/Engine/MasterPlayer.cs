@@ -26,6 +26,7 @@ namespace LibSequentia.Engine
 				ManualProgress,			// 강제진행
 
 				NewTrack,				// 새 트랙 올리기
+				NewTransitionScenario,	/// 새 트랜지션 시나리오
 			}
 
 			public Type		type;
@@ -81,12 +82,37 @@ namespace LibSequentia.Engine
 		SectionPlayer.TransitionType m_transitionType;					// 전환 타입
 		State					m_state;								// 현재 플레이어 상태
 
+		Data.TransitionScenario	m_tranScenario;							// 전환 시나리오
+
+
+		/// <summary>
+		/// 음악의 긴장도
+		/// </summary>
 		public float tension
 		{
 			set
 			{
 				m_trackPlayer[0].tension	= value;
 				m_trackPlayer[1].tension	= value;
+			}
+		}
+
+
+		float	m_transition;
+
+		/// <summary>
+		/// 곡 전환시 트랜지션
+		/// </summary>
+		public float transition
+		{
+			get { return m_transition; }
+			set
+			{
+				m_transition	= value;
+				if (m_tranScenario != null)
+				{
+					m_tranScenario.transition	= value;
+				}
 			}
 		}
 
@@ -107,6 +133,12 @@ namespace LibSequentia.Engine
 			m_trackPlayer[1]	= p2;
 		}
 
+		public void SetTransitionCtrls(Data.IAutomationControl p1, Data.IAutomationControl p2)
+		{
+			m_trackTransCtrls[0]	= p1;
+			m_trackTransCtrls[1]	= p2;
+		}
+
 		public void DoNaturalProgress()
 		{
 			m_msgQueue.Enqueue(new Message() { type = Message.Type.NaturalProgress });
@@ -121,9 +153,10 @@ namespace LibSequentia.Engine
 		/// 새 트랙 올리기. 재생은 하지 않음. 다음번 진행 타이밍에 맞춰서 시작
 		/// </summary>
 		/// <param name="track"></param>
-		public void SetNewTrack(Data.Track track)
+		public void SetNewTrack(Data.Track track, Data.TransitionScenario trans = null)
 		{
 			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTrack, parameter = track });
+			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans });
 		}
 
 		private bool ProcessMessage(ref Message msg)
@@ -134,11 +167,11 @@ namespace LibSequentia.Engine
 				case Message.Type.ManualProgress:
 					{
 						var trtime	= currentPlayer.DoManualProgress();
-						consume		= (trtime >= 0);
+						consume		= (trtime.transitionStart >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
 						{
-							lastCalculatedTransitionTime = trtime;
+							lastCalculatedTransitionTime = trtime.transitionEnd;
 							m_transitionType		= SectionPlayer.TransitionType.Manual;
 							m_transitionReserved	= true;
 						}
@@ -148,11 +181,11 @@ namespace LibSequentia.Engine
 				case Message.Type.NaturalProgress:
 					{
 						var trtime	= currentPlayer.DoNaturalProgress();
-						consume		= (trtime >= 0);
+						consume		= (trtime.transitionStart >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
 						{
-							lastCalculatedTransitionTime = trtime;
+							lastCalculatedTransitionTime = trtime.transitionEnd;
 							m_transitionType		= SectionPlayer.TransitionType.Natural;
 							m_transitionReserved	= true;
 						}
@@ -171,6 +204,11 @@ namespace LibSequentia.Engine
 					{
 						consume = false;
 					}
+					break;
+
+				case Message.Type.NewTransitionScenario:
+					m_tranScenario	= msg.parameter as Data.TransitionScenario;
+					consume	= true;
 					break;
 
 				default:
@@ -221,7 +259,13 @@ namespace LibSequentia.Engine
 						m_newTrackReady			= false;
 						m_transitionReserved	= false;
 
-						// TODO : TransitionScenario 준비
+						if (m_tranScenario != null)											// TransitionScenario 준비
+						{
+							// TODO : reverse에 대한 고려가 필요하다. 해당 트랜지션이 리버스인지에 대해서는 트랜지션 시나리오를 초기화하는 과정에서 결정.
+
+							m_tranScenario.SetAutomationTargets(m_trackTransCtrls[m_playerIdx], m_trackTransCtrls[(m_playerIdx + 1) % 2]);
+							transition			= m_tranScenario.reverseTransition? 1 : 0;
+						}
 					}
 				}
 				else
@@ -278,7 +322,13 @@ namespace LibSequentia.Engine
 			{
 				m_state	= State.PlayingOneSide;
 
-				// TODO : TransitionScenario 끝내기
+				if (m_tranScenario != null)												// TransitionScenario 끝내기
+				{
+					transition		= m_tranScenario.reverseTransition? 0 : 1;
+					m_tranScenario	= null;
+				}
+
+				sidePlayer.StopImmediately();											// 한쪽 플레이어 급히 정지
 			}
 		}
 

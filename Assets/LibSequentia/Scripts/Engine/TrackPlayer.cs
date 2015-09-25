@@ -10,6 +10,16 @@ namespace LibSequentia.Engine
 	/// </summary>
 	public class TrackPlayer
 	{
+		/// <summary>
+		/// 트랜지션시 시간 정보
+		/// </summary>
+		public struct TransitionTimeInfo
+		{
+			public double	transitionStart;		// 트랜지션 시작 - 새 섹션이 시작되는 시점
+			public double	transitionEnd;			// 트랜지션 종료 - 새 섹션의 루프 시작 지점
+		}
+
+
 		// Constants
 
 		const int					c_playerCount	= 2;
@@ -154,7 +164,7 @@ namespace LibSequentia.Engine
 		/// </summary>
 		/// <param name="suppressProgress">현재 섹션을 마지막으로 재생을 멈춘다.</param>
 		/// <returns>transition이 발생할 시간. transition을 할 수 없었던 경우 -1 리턴</returns>
-		public double DoNaturalProgress(bool suppressProgress = false)
+		public TransitionTimeInfo DoNaturalProgress(bool suppressProgress = false)
 		{
 			m_suppressProgress	= suppressProgress;
 			return DoProgress(SectionPlayer.TransitionType.Natural);
@@ -165,7 +175,7 @@ namespace LibSequentia.Engine
 		/// </summary>
 		/// <param name="suppressProgress">현재 섹션을 마지막으로 재생을 멈춘다.</param>
 		/// <returns>transition이 발생할 시간. transition을 할 수 없었던 경우 -1 리턴</returns>
-		public double DoManualProgress(bool suppressProgress = false)
+		public TransitionTimeInfo DoManualProgress(bool suppressProgress = false)
 		{
 			m_suppressProgress	= suppressProgress;
 			return DoProgress(SectionPlayer.TransitionType.Manual);
@@ -175,12 +185,12 @@ namespace LibSequentia.Engine
 		/// 즉시 진행. 최초 플레이시에만 가능하다
 		/// </summary>
 		/// <returns></returns>
-		public double DoInstantProgress()
+		public TransitionTimeInfo DoInstantProgress()
 		{
 			return DoProgress(SectionPlayer.TransitionType.Instant);
 		}
 
-		double DoProgress(SectionPlayer.TransitionType ttype)
+		TransitionTimeInfo DoProgress(SectionPlayer.TransitionType ttype)
 		{
 			// 트랜지션을 해도 괜찮은 상황인지 체크
 
@@ -200,7 +210,9 @@ namespace LibSequentia.Engine
 
 			// 여기서부터는 sidePlayer => 기존에 재생중이던 플레이어가 됨
 
-			double newSectionStart	= -1;
+			TransitionTimeInfo tinfo	= new TransitionTimeInfo();
+			tinfo.transitionStart		= -1;
+			tinfo.transitionEnd			= -1;
 
 			// 기존 재생중이던 플레이어가 트랜지션 진행중이지 않고, 좀더 상위의 트랜지션을 걸 때
 			if (!sidePlayer.isOnTransition
@@ -208,17 +220,23 @@ namespace LibSequentia.Engine
 			{
 				if(m_sectionIdx > 0 && !m_suppressProgress)	// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
 				{
-					newSectionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
+					tinfo.transitionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
 				}
 				else
 				{
-					newSectionStart	= m_clock.CalcNextSafeBeatTime();
+					tinfo.transitionStart	= m_clock.CalcNextSafeBeatTime();
 				}
 
 
 				if (m_sectionIdx < m_track.sectionCount)
 				{
-					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, newSectionStart);
+					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, tinfo.transitionStart);
+					tinfo.transitionEnd		= currentPlayer.firstLoopStartDspTime;
+				}
+				else
+				{
+					// TODO : 필요할지는 모르겠는데, 새 섹션이 시작되지 않는 경우에도 올바른 트랜지션 종료 타이밍을 계산해서 집어넣게 수정해야 할지도...
+					tinfo.transitionEnd		= tinfo.transitionStart;
 				}
 			}
 			else
@@ -226,7 +244,7 @@ namespace LibSequentia.Engine
 				Debug.Log(string.Format("sidePlayer.isOnTransition : {0}, sidePlayer.currentEndTransition : {1}", sidePlayer.isOnTransition, sidePlayer.currentEndTransition));
 			}
 
-			return newSectionStart;
+			return tinfo;
 		}
 
 		/// <summary>

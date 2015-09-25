@@ -36,7 +36,7 @@ namespace LibSequentia.Engine
 			FillIn,				// Fill-in
 			Looping,			// Section 루프중
 			AfterLoop,			// 루프 이후
-			End,				// 음원 종료
+			//End,				// 음원 종료
 		}
 
 		/// <summary>
@@ -58,6 +58,7 @@ namespace LibSequentia.Engine
 		const int		c_playerComponentsCount	= 2;
 
 
+
 		// Members
 
 		Data.Section	m_sectionData;					// 재생하려는 섹션 정보
@@ -72,6 +73,10 @@ namespace LibSequentia.Engine
 		/// 다음번에 올 루프 끝부분 dspTime
 		/// </summary>
 		public double nextLoopEndDspTime { get; private set; }
+		/// <summary>
+		/// 첫 루프가 시작되는 타이밍
+		/// </summary>
+		public double firstLoopStartDspTime { get; private set; }
 
 
 		TransitionType	m_startTransition;				// 시작시 Transition 타입
@@ -286,7 +291,8 @@ namespace LibSequentia.Engine
 
 			// 필요한 시간값은 멤버로 보관
 			//m_timePlayStart		= timePlay;
-			nextLoopEndDspTime	= timeNextLoopEnd;
+			firstLoopStartDspTime	= timeLoopStart;
+			nextLoopEndDspTime		= timeNextLoopEnd;
 			
 
 			while (AudioSettings.dspTime < timePlay)			// 재생될 때까지 대기
@@ -409,6 +415,9 @@ namespace LibSequentia.Engine
 				if (m_transitionCo != null)
 					m_context.StopCoroutine(m_transitionCo);
 
+				m_endTransition	= TransitionType.None;
+				isOnTransition	= false;
+				m_state			= State.AfterLoop;
 				
 				currentPlayerComponent.StopImmediately();
 				SwitchPlayerComponent();
@@ -476,7 +485,7 @@ namespace LibSequentia.Engine
 			Debug.Log("Natural Transition Start dspTime" + AudioSettings.dspTime);
 
 			var automation	= GetAutomation(m_sectionData.outTypeNatural);
-			while (AudioSettings.dspTime < transitionEnd)	// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
+			while (AudioSettings.dspTime < transitionEnd)		// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
 			{
 				if (automation != null)							// 오토메이션 적용
 				{

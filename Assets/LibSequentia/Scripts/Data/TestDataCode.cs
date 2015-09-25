@@ -218,4 +218,26 @@ namespace LibSequentia.Data
 			return track;
 		}
 	}
+
+	public partial class TransitionScenario
+	{
+		public static TransitionScenario GenTestScenario()
+		{
+			var scen				= new TransitionScenario();
+
+			var intro_vol			= new Automation();
+			intro_vol.targetParam	= Automation.TargetParam.Volume;
+			intro_vol.AddPoint(0, 0);
+			intro_vol.AddPoint(1, 1);
+			scen.AddIntroAutomation(intro_vol);
+
+			var outro_vol			= new Automation();
+			outro_vol.targetParam	= Automation.TargetParam.Volume;
+			outro_vol.AddPoint(1, 0);
+			outro_vol.AddPoint(0, 1);
+			scen.AddOutroAutomation(outro_vol);
+
+			return scen;
+		}
+	}
 }

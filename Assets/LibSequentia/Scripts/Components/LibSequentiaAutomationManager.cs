@@ -46,7 +46,11 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 
 			// 변환 함수 목록
 			ParamInfo.ValueFunc func_linear	= (float input, ParamInfo info) => (info.valueMax - info.valueMin) * input - info.valueMin;
-			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => Mathf.Max(info.valueMin, 20 * Mathf.Log10(input));
+			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => Mathf.Max(info.valueMin, 20 * Mathf.Log10(Mathf.Min(1, input * 1.05f)));
+
+			// Note : 일반 게임 루프의 타이밍 비정확성 + 정박 킥 때문에 정박에서 트랜지션을 할 경우 킥의 앞부분이 날카롭게 잘려 click 사운드가 발생하는 문제가 있음.
+			// volume 그래프를 수정해야할 필요가 있어보임.
+			// 현재는 input의 윗부분을 살짝 flatten해버리는 방법으로 임시로 해결.
 
 			//
 			s_infoDict[Automation.TargetParam.Volume]	= new ParamInfo() { valueMin = -80f,	valueMax = 0f,	mixerParamName = "Volume",	valueFunc = func_volume };

@@ -19,6 +19,9 @@ public class TestScript : MonoBehaviour
 	[SerializeField]
 	UnityEngine.Audio.AudioMixer [] m_mixers_deckB;
 
+	[SerializeField]
+	UnityEngine.Audio.AudioMixer [] m_mixers_decks;
+
 
 	LibSequentiaAutomationManager	m_automationMgr;
 	LibSequentiaAudioClipDepot		m_audioClipDepot;
@@ -31,6 +34,7 @@ public class TestScript : MonoBehaviour
 
 	string[] autoctrlLayerNames	= { "da-1-1", "da-1-2", "da-1-3", "da-1-4", "da-2-1", "da-2-2", "da-2-3", "da-2-4", "db-1-1", "db-1-2", "db-1-3", "db-1-4", "db-2-1", "db-2-2", "db-2-3", "db-2-4", };
 	string[] autoctrlSecNames	= { "da-1", "da-2", "db-1", "db-2" };
+	string[] autoctrlDeckNames	= { "da", "db" };
 
 	Track []						m_tracks = new Track[2];
 	int								m_trackIdx = 0;
@@ -46,6 +50,7 @@ public class TestScript : MonoBehaviour
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[5], m_mixers_sec2[1]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[6], m_mixers_sec2[2]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[7], m_mixers_sec2[3]);
+
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[8], m_mixers_sec3[0]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[9], m_mixers_sec3[1]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[10], m_mixers_sec3[2]);
@@ -59,6 +64,10 @@ public class TestScript : MonoBehaviour
 		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[1], m_mixers_deckA[1]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[2], m_mixers_deckB[0]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[3], m_mixers_deckB[1]);
+
+		m_automationMgr.AddAutomationControlToMixer(autoctrlDeckNames[0], m_mixers_decks[0]);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlDeckNames[1], m_mixers_decks[1]);
+
 
 		// 텐션 오토메이션 버스 생성
 		AutomationHub [] tensionCtrlBus			= new AutomationHub[4];
@@ -132,6 +141,9 @@ public class TestScript : MonoBehaviour
 
 		m_masterplayer		= new MasterPlayer(this);
 		m_masterplayer.SetTrackPlayers(tplayer1, tplayer2);
+		var deckActrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[0]);
+		var deckBctrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[1]);
+		m_masterplayer.SetTransitionCtrls(deckActrl, deckBctrl);
 		m_masterplayer.SetNewTrack(m_tracks[0]);
 		m_masterplayer.tension	= 0;
 	}
@@ -185,10 +197,21 @@ public class TestScript : MonoBehaviour
 			m_masterplayer.tension	= m_tension;
 		}
 
-		if (Input.GetKeyDown(KeyCode.Return))
+		if (Input.GetKeyDown(KeyCode.C))			// C 키 : 다음 트랙 준비
 		{
+			Debug.Log("newtrack");
 			m_trackIdx = (m_trackIdx + 1) % 2;
-			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx]);
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario());
+		}
+
+		if (Input.GetKeyDown(KeyCode.Comma))		// < 키 (이전 트랙쪽으로 트랜지션 옮기기)
+		{
+			m_masterplayer.transition	= Mathf.Max(0, m_masterplayer.transition - 0.1f);
+		}
+
+		if (Input.GetKeyDown(KeyCode.Period))		// > 키 (다음 트랙쪽으로 트랜지션 옮기기)
+		{
+			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
 		}
 	}
 }

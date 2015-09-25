@@ -8,7 +8,7 @@ namespace LibSequentia.Data
 	/// <summary>
 	/// Track 사이의 전환 automation
 	/// </summary>
-	public class TransitionScenario
+	public partial class TransitionScenario
 	{
 		// Members
 
@@ -57,6 +57,27 @@ namespace LibSequentia.Data
 					}
 				}
 			}
+		}
+
+		/// <summary>
+		/// 타겟 설정
+		/// </summary>
+		/// <param name="intro"></param>
+		/// <param name="outro"></param>
+		public void SetAutomationTargets(IAutomationControl intro, IAutomationControl outro)
+		{
+			m_introAutoTarget	= intro;
+			m_outroAutoTarget	= outro;
+		}
+
+		public void AddIntroAutomation(Automation auto)
+		{
+			m_introAutomations.Add(auto);
+		}
+
+		public void AddOutroAutomation(Automation auto)
+		{
+			m_outroAutomations.Add(auto);
 		}
 	}
 }
