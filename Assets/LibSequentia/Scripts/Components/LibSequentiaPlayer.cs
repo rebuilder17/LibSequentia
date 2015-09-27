@@ -141,10 +141,7 @@ public class LibSequentiaPlayer : MonoBehaviour, IPlayerComponent
 			var source			= m_audioSources[i];
 			if (source.clip != null)
 			{
-				if (offset > 0)
-				{
-					source.timeSamples	= (int)(offset * (double)source.clip.frequency);
-				}
+				source.timeSamples	= (int)(offset * (double)source.clip.frequency);
 				source.PlayScheduled(dsptime);
 			}
 		}

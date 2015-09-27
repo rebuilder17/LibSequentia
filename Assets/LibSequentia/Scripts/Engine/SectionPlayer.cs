@@ -286,6 +286,7 @@ namespace LibSequentia.Engine
 				timeLoopStart	-= offset;
 				timeNextLoopEnd	-= offset;
 			}
+			Debug.Log("PlayScheduled time : " + timePlay + ", offset : " + offset);
 			curplayer.PlayScheduled(timePlay, offset);			// 다음번 비트에 음원 재생
 
 
@@ -471,12 +472,16 @@ namespace LibSequentia.Engine
 
 
 			Debug.Log("current dspTime : " + AudioSettings.dspTime + ", transitionStart : " + transitionStart);
+			Debug.Log("nextLoopEndDspTime : " + nextLoopEndDspTime + ", m_endtransitionLength : " + m_endTransitionLength);
 
 			while (AudioSettings.dspTime < transitionStart)		// 트랜지션 시작 시간까지 대기
 			{
 				// FIX : 이번 회차에 루프를 끝내야 하는 경우 루프 중지 플래그를 올린다.
-				if (!m_suppressLooping && transitionStart - AudioSettings.dspTime < m_loopLengthDspTime)
+				if (!m_suppressLooping && transitionEnd - AudioSettings.dspTime < m_loopLengthDspTime)
+				{
 					m_suppressLooping	= true;
+					Debug.Log("TransitionCo_Natural : loop suppressed");
+				}
 
 				yield return null;
 			}

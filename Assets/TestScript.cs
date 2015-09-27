@@ -144,7 +144,7 @@ public class TestScript : MonoBehaviour
 		var deckActrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[0]);
 		var deckBctrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[1]);
 		m_masterplayer.SetTransitionCtrls(deckActrl, deckBctrl);
-		m_masterplayer.SetNewTrack(m_tracks[0]);
+		m_masterplayer.SetNewTrack(m_tracks[m_trackIdx]);
 		m_masterplayer.tension	= 0;
 	}
 

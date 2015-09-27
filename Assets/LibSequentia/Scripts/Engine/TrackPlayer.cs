@@ -223,13 +223,14 @@ namespace LibSequentia.Engine
 					tinfo.transitionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
 				}
 				else
-				{
+				{											// 그 외의 경우엔 전부 다음 비트에 트랜지션 시작하는 것으로
 					tinfo.transitionStart	= m_clock.CalcNextSafeBeatTime();
 				}
 
 
 				if (m_sectionIdx < m_track.sectionCount)
 				{
+					Debug.LogWarning("start : " + ttype);
 					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, tinfo.transitionStart);
 					tinfo.transitionEnd		= currentPlayer.firstLoopStartDspTime;
 				}
@@ -264,6 +265,10 @@ namespace LibSequentia.Engine
 				if (ttype == SectionPlayer.TransitionType.Manual)	// 강제 전환은 fillin 앞부분이 잘림
 				{
 					trbeats			-= nextsec.beatFillIn;
+				}
+				else if (ttype == SectionPlayer.TransitionType.Instant)	// 즉시 전환은 전환시간 없음
+				{
+					trbeats			= 0;
 				}
 			}
 
