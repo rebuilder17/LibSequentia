@@ -23,6 +23,8 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 			public string	mixerParamName;		// mixer external parameter 이름
 			public ValueFunc valueFunc;			// 인풋-아웃풋 변환 함수
 
+			public string [] snapshotNames;		// Interpolation에 사용할 스냅샷 이름들
+
 			public float ToMixerParamValue(float value)
 			{
 				//return (valueMax - valueMin) * value + valueMin;
@@ -45,31 +47,65 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 			}
 
 			// 변환 함수 목록
-			ParamInfo.ValueFunc func_linear	= (float input, ParamInfo info) => (info.valueMax - info.valueMin) * input - info.valueMin;
-			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => Mathf.Max(info.valueMin, 20 * Mathf.Log10(Mathf.Min(1, input * 1.05f)));
-
-			// Note : 일반 게임 루프의 타이밍 비정확성 + 정박 킥 때문에 정박에서 트랜지션을 할 경우 킥의 앞부분이 날카롭게 잘려 click 사운드가 발생하는 문제가 있음.
-			// volume 그래프를 수정해야할 필요가 있어보임.
-			// 현재는 input의 윗부분을 살짝 flatten해버리는 방법으로 임시로 해결.
+			ParamInfo.ValueFunc func_linear	= (float input, ParamInfo info) => (info.valueMax - info.valueMin) * input + info.valueMin;
+			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => 1 - (Mathf.Max(info.valueMin, 20 * Mathf.Log10(input)) / info.valueMin);
 
 			//
-			s_infoDict[Automation.TargetParam.Volume]	= new ParamInfo() { valueMin = -80f,	valueMax = 0f,	mixerParamName = "Volume",	valueFunc = func_volume };
+			s_infoDict[Automation.TargetParam.Volume]	= new ParamInfo() { valueMin = -80f, valueMax = 0f, mixerParamName = null, valueFunc = func_volume, snapshotNames = new string[] { "VolumeZero", "VolumeFull" } };
+			s_infoDict[Automation.TargetParam.LowCut]	= new ParamInfo() { valueMin = -80f, valueMax = 0f, mixerParamName = "LowCutLevel", valueFunc = func_linear };
 		}
 
 
 		// Members
 
 		AudioMixer	m_mixer;
+		Dictionary<Automation.TargetParam, AudioMixerSnapshot []> m_snapshotDict	= new Dictionary<Automation.TargetParam, AudioMixerSnapshot[]>();
+		HashSet<Automation.TargetParam>	m_ignoreParam	= new HashSet<Automation.TargetParam>();
 
 		public AudioMixerAutomationControl(AudioMixer mixer)
 		{
 			m_mixer	= mixer;
 		}
 
+		/// <summary>
+		/// 오토메이션 적용을 무시할 파라미터 세팅
+		/// </summary>
+		/// <param name="param"></param>
+		public void AddParamToIgnore(Automation.TargetParam param)
+		{
+			m_ignoreParam.Add(param);
+		}
+
+		static float [] _temp_snapshot_weight = new float[] { 0, 1 };
 		public void Set(Automation.TargetParam param, float value)
 		{
+			if (m_ignoreParam.Contains(param))					// 무시 목록에 없을 때만 실행한다.
+				return;
+
 			var info	= s_infoDict[param];
-			m_mixer.SetFloat(info.mixerParamName, info.ToMixerParamValue(value));
+			if (info.mixerParamName != null)					// ExposedParam을 조절하는 케이스
+			{
+				m_mixer.SetFloat(info.mixerParamName, info.ToMixerParamValue(value));
+			}
+			else
+			{													// Snapshot을 조절하는 케이스
+				AudioMixerSnapshot [] snapshots;
+				if (!m_snapshotDict.TryGetValue(param, out snapshots))	// 해당 파라미터에 맞는 스냅샷 목록을 아직 레퍼런스로 소유하고 있지 않다면, 찾아서 등록
+				{
+					int namecount	= info.snapshotNames.Length;
+					snapshots		= new AudioMixerSnapshot[namecount];
+					for (int i = 0; i < namecount; i++)
+					{
+						snapshots[i]	= m_mixer.FindSnapshot(info.snapshotNames[i]);
+					}
+					m_snapshotDict[param]	= snapshots;
+				}
+
+				var calcvalue				= info.ToMixerParamValue(value);
+				_temp_snapshot_weight[0]	= 1 - calcvalue;
+				_temp_snapshot_weight[1]	= calcvalue;
+				m_mixer.TransitionToSnapshots(snapshots, _temp_snapshot_weight, 0.01f);
+			}
 		}
 	}
 	//
@@ -96,9 +132,15 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 		}
 	}
 
-	public void AddAutomationControlToMixer(string ctrlname, AudioMixer mixer)
+	public void AddAutomationControlToMixer(string ctrlname, AudioMixer mixer, bool simpleCtrl = false)
 	{
-		m_mixerControls[ctrlname]	= new AudioMixerAutomationControl(mixer);
+		var mixerctrl				= new AudioMixerAutomationControl(mixer);
+		m_mixerControls[ctrlname]	= mixerctrl;
+
+		if(simpleCtrl)				// 단순화하는 경우 일부 파라미터를 조정하지 못하도록 지정한다.
+		{
+			mixerctrl.AddParamToIgnore(Automation.TargetParam.LowCut);
+		}
 	}
 
 	public IAutomationControl GetAutomationControlToSingleMixer(string ctrlname)

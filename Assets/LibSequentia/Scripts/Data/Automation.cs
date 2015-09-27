@@ -24,6 +24,7 @@ namespace LibSequentia.Data
 		public enum TargetParam
 		{
 			Volume,					// 볼륨
+			LowCut,					// 로우컷 레벨 (0 : 로우컷 하지 않음 1 : 완전히 로우컷)
 		}
 
 		/// <summary>
@@ -91,23 +92,20 @@ namespace LibSequentia.Data
 			}
 			else
 			{											// 데이터가 하나 이상일 경우엔 인덱스를 직접 구한다
-				int i1, i2;
-				GetIndiciesForTimeRatio(timeRatio, out i1, out i2);
-
-				if (i1 == i2)							// 인덱스 간격이 아니라 정확히 한 인덱스를 가리키는 경우
+				var count		= m_data.Count;
+				bool inserted	= false;
+				for (int i = 0; i < count; i++)
 				{
-					if (i2 == (datacount - 1))			// 케이스 2 - 해당 인덱스가 마지막인 경우 add
+					if (m_data[i].timeRatio > timeRatio)	// timeRatio가 더 큰 점을 찾는다면 바로 그 앞에 insert한다
 					{
-						m_data.Add(newp);
-					}
-					else
-					{									// 케이스 3 - 해당 인덱스가 중간 혹은 처음에 오는 것일 경우, 인덱스 + 1 지점에 추가
-						m_data.Insert(i2 + 1, newp);
+						m_data.Insert(i, newp);
+						inserted = true;
 					}
 				}
-				else
-				{										// 그 외 모든 경우엔 인덱스 범위에서 뒤쪽 인덱스로 insert한다 (인덱스 범위 안쪽으로 추가됨)
-					m_data.Insert(i2, newp);
+
+				if (!inserted)							// 위 루프에서 점을 추가하지 못한 경우 맨 마지막에 추가
+				{
+					m_data.Add(newp);
 				}
 			}
 		}

@@ -239,5 +239,40 @@ namespace LibSequentia.Data
 
 			return scen;
 		}
+
+		public static TransitionScenario GenTestScenario2()
+		{
+			var scen				= new TransitionScenario();
+
+			var intro_vol			= new Automation();
+			intro_vol.targetParam	= Automation.TargetParam.Volume;
+			intro_vol.AddPoint(0, 0);
+			intro_vol.AddPoint(0.5f, 1);
+			intro_vol.AddPoint(1.0f, 1);
+			scen.AddIntroAutomation(intro_vol);
+			var intro_lowcut		= new Automation();
+			intro_lowcut.targetParam	= Automation.TargetParam.LowCut;
+			intro_lowcut.AddPoint(0, 1);
+			intro_lowcut.AddPoint(0.5f, 1);
+			intro_lowcut.AddPoint(0.5f, 0);
+			intro_lowcut.AddPoint(1, 0);
+			scen.AddIntroAutomation(intro_lowcut);
+
+			var outro_vol			= new Automation();
+			outro_vol.targetParam	= Automation.TargetParam.Volume;
+			outro_vol.AddPoint(0, 1);
+			outro_vol.AddPoint(0.5f, 1);
+			outro_vol.AddPoint(1, 0);
+			scen.AddOutroAutomation(outro_vol);
+			var outro_lowcut		= new Automation();
+			outro_lowcut.targetParam	= Automation.TargetParam.LowCut;
+			outro_lowcut.AddPoint(0, 0);
+			outro_lowcut.AddPoint(0.5f, 0);
+			outro_lowcut.AddPoint(0.5f, 1);
+			outro_lowcut.AddPoint(1, 1);
+			scen.AddOutroAutomation(outro_lowcut);
+
+			return scen;
+		}
 	}
 }

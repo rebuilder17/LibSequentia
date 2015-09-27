@@ -40,6 +40,7 @@ namespace LibSequentia.Data
 
 			s_defaultValues						= new Dictionary<TargetParam, float>();
 			s_defaultValues[TargetParam.Volume]	=  1.0f;
+			s_defaultValues[TargetParam.LowCut]	=  0.0f;
 
 
 

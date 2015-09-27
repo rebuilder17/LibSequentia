@@ -43,7 +43,7 @@ namespace LibSequentia.Data
 					for(int i = 0; i < count; i++)
 					{
 						var auto	= m_introAutomations[i];
-						m_introAutoTarget.Set(auto.targetParam, auto.GetValue(value));
+						m_introAutoTarget.Set(auto.targetParam, auto.GetValue(ratio));
 					}
 				}
 
@@ -53,7 +53,7 @@ namespace LibSequentia.Data
 					for(int i = 0; i < count; i++)
 					{
 						var auto	= m_outroAutomations[i];
-						m_outroAutoTarget.Set(auto.targetParam, auto.GetValue(value));
+						m_outroAutoTarget.Set(auto.targetParam, auto.GetValue(ratio));
 					}
 				}
 			}

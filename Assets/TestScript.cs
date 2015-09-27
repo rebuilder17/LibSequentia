@@ -41,29 +41,36 @@ public class TestScript : MonoBehaviour
 	
 	void Awake()
 	{
+		// TEST : 버퍼 사이즈를 조절해본다.
+		var audioSettings			= AudioSettings.GetConfiguration();
+		Debug.Log("original buffer size is : " + audioSettings.dspBufferSize);
+		audioSettings.dspBufferSize	= 256;
+		AudioSettings.Reset(audioSettings);
+		//
+
 		m_automationMgr = gameObject.AddComponent<LibSequentiaAutomationManager>();
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[0], m_mixers_sec1[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[1], m_mixers_sec1[1]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[2], m_mixers_sec1[2]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[3], m_mixers_sec1[3]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[4], m_mixers_sec2[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[5], m_mixers_sec2[1]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[6], m_mixers_sec2[2]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[7], m_mixers_sec2[3]);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[0], m_mixers_sec1[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[1], m_mixers_sec1[1], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[2], m_mixers_sec1[2], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[3], m_mixers_sec1[3], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[4], m_mixers_sec2[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[5], m_mixers_sec2[1], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[6], m_mixers_sec2[2], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[7], m_mixers_sec2[3], true);
 
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[8], m_mixers_sec3[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[9], m_mixers_sec3[1]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[10], m_mixers_sec3[2]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[11], m_mixers_sec3[3]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[12], m_mixers_sec4[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[13], m_mixers_sec4[1]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[14], m_mixers_sec4[2]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[15], m_mixers_sec4[3]);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[8], m_mixers_sec3[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[9], m_mixers_sec3[1], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[10], m_mixers_sec3[2], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[11], m_mixers_sec3[3], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[12], m_mixers_sec4[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[13], m_mixers_sec4[1], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[14], m_mixers_sec4[2], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlLayerNames[15], m_mixers_sec4[3], true);
 
-		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[0], m_mixers_deckA[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[1], m_mixers_deckA[1]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[2], m_mixers_deckB[0]);
-		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[3], m_mixers_deckB[1]);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[0], m_mixers_deckA[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[1], m_mixers_deckA[1], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[2], m_mixers_deckB[0], true);
+		m_automationMgr.AddAutomationControlToMixer(autoctrlSecNames[3], m_mixers_deckB[1], true);
 
 		m_automationMgr.AddAutomationControlToMixer(autoctrlDeckNames[0], m_mixers_decks[0]);
 		m_automationMgr.AddAutomationControlToMixer(autoctrlDeckNames[1], m_mixers_decks[1]);
@@ -201,7 +208,7 @@ public class TestScript : MonoBehaviour
 		{
 			Debug.Log("newtrack");
 			m_trackIdx = (m_trackIdx + 1) % 2;
-			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario());
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario2());
 		}
 
 		if (Input.GetKeyDown(KeyCode.Comma))		// < 키 (이전 트랙쪽으로 트랜지션 옮기기)
@@ -210,6 +217,60 @@ public class TestScript : MonoBehaviour
 		}
 
 		if (Input.GetKeyDown(KeyCode.Period))		// > 키 (다음 트랙쪽으로 트랜지션 옮기기)
+		{
+			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
+		}
+	}
+
+	void OnGUI()
+	{
+		var buttonrect	= new Rect() { x = 0, y = 0, width = 200, height = 100 };
+		if (GUI.Button(buttonrect, "Natural"))			// 자연 진행
+		{
+			Debug.Log("Natural Transition");
+			m_masterplayer.DoNaturalProgress();
+		}
+
+		buttonrect.x	= 200;
+		if (GUI.Button(buttonrect, "Manual"))			// 강제 진행
+		{
+			Debug.Log("Manual Transition");
+			m_masterplayer.DoManualProgress();
+		}
+
+		buttonrect.x	= 0;
+		buttonrect.y	= 100;
+		if (GUI.Button(buttonrect, "tension+"))		// '+' 키 (텐션 업)
+		{
+			m_tension	= Mathf.Min(1f, m_tension + 0.1f);
+			m_masterplayer.tension	= m_tension;
+		}
+
+		buttonrect.x	= 200;
+		if (GUI.Button(buttonrect, "tension-"))		// '-' 키 (텐션 다운)
+		{
+			m_tension	= Mathf.Max(0f, m_tension - 0.1f);
+			m_masterplayer.tension	= m_tension;
+		}
+
+		buttonrect.x	= 0;
+		buttonrect.y	= 200;
+		if (GUI.Button(buttonrect, "NextTrack"))			// C 키 : 다음 트랙 준비
+		{
+			Debug.Log("newtrack");
+			m_trackIdx = (m_trackIdx + 1) % 2;
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario2());
+		}
+
+		buttonrect.x	= 0;
+		buttonrect.y	= 300;
+		if (GUI.Button(buttonrect, "<<"))		// < 키 (이전 트랙쪽으로 트랜지션 옮기기)
+		{
+			m_masterplayer.transition	= Mathf.Max(0, m_masterplayer.transition - 0.1f);
+		}
+
+		buttonrect.x	= 200;
+		if (GUI.Button(buttonrect, ">>"))		// > 키 (다음 트랙쪽으로 트랜지션 옮기기)
 		{
 			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
 		}
