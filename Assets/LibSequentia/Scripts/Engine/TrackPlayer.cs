@@ -103,6 +103,42 @@ namespace LibSequentia.Engine
 			get { return m_clock; }
 		}
 
+		//
+
+		
+
+		/// <summary>
+		/// 현재의 "진행도".
+		/// 홀수 : 다음 가리키는 섹션으로 자연 트랜지션중임
+		/// 짝수 : 다음 가리키는 섹션으로 강제 트랜지션중이거나 해당 섹션에 도달
+		/// 현재 재생중인 트랙의 인덱스 = 버림(진행도 / 2) - 1.
+		/// 즉 아무것도 재생중인 경우가 아닐 시 0, 첫 번째 섹션이 재생중일 때는 2, 그 다음은 4, ...
+		/// </summary>
+		public int step
+		{
+			get
+			{
+				var stepcalc	= m_sectionIdx * 2 + 1;							// 현재의 sectionIdx 기준으로 우선 계산
+				if (m_curTransition == SectionPlayer.TransitionType.Natural)	// 자연 진행이 걸린 경우 홀수값으로 리턴해줘야한다.
+				{
+					// 정방향의 경우 다음에 올라가야하므로 -1 해줘야하고,
+					// 역방향의 경우 다음에 내려가야하므로 1 더해준다
+					stepcalc	+= reverse? 1 : -1;
+				}
+
+				return stepcalc;
+			}
+		}
+
+		SectionPlayer.TransitionType	m_curTransition;
+
+		/// <summary>
+		/// 역진행중인지 여부
+		/// </summary>
+		public bool reverse { get; private set; }
+
+		//
+
 
 
 		public TrackPlayer(MonoBehaviour context)
@@ -185,19 +221,35 @@ namespace LibSequentia.Engine
 		/// 즉시 진행. 최초 플레이시에만 가능하다
 		/// </summary>
 		/// <returns></returns>
-		public TransitionTimeInfo DoInstantProgress()
+		public TransitionTimeInfo DoInstantProgress(bool reverse)
 		{
-			return DoProgress(SectionPlayer.TransitionType.Instant);
+			var sectionIdx	= reverse? m_track.sectionCount - 1 : 0;
+			var tinfo		= DoProgress(SectionPlayer.TransitionType.Instant, sectionIdx);
+
+			if (tinfo.transitionEnd != -1)		// 트랜지션이 정상적으로 예약된 경우 reverse 설정을 보관
+			{
+				this.reverse	= reverse;
+			}
+			return tinfo;
 		}
 
-		TransitionTimeInfo DoProgress(SectionPlayer.TransitionType ttype)
+		TransitionTimeInfo DoProgress(SectionPlayer.TransitionType ttype, int sectionIdxOverride = int.MinValue)
 		{
 			// 트랜지션을 해도 괜찮은 상황인지 체크
 
 			if (sidePlayer.isReadyOrFinished)	// 다른쪽 플레이어가 재생중이 아니거나 루프 종료된 경우 스위칭. 새로 재생할 플레이어가 currentPlayer가 된다
 			{
 				SwitchPlayer();
-				m_sectionIdx++;
+
+				if (sectionIdxOverride == int.MinValue)		// 다음 섹션 idx를 오버라이드하지 않은 경우엔 자동으로 +1
+				{
+					m_sectionIdx++;
+				}
+				else
+				{											// 오버라이드한 경우
+					m_sectionIdx	= sectionIdxOverride;
+				}
+				
 				Debug.Log("switch player. section idx : " + m_sectionIdx);
 			}
 
@@ -239,6 +291,10 @@ namespace LibSequentia.Engine
 					// TODO : 필요할지는 모르겠는데, 새 섹션이 시작되지 않는 경우에도 올바른 트랜지션 종료 타이밍을 계산해서 집어넣게 수정해야 할지도...
 					tinfo.transitionEnd		= tinfo.transitionStart;
 				}
+
+				// 트랜지션 추적 (step을 올바르게 업데이트하기 위해서)
+				m_curTransition	= ttype;
+				StartTransitionMonitor(tinfo);
 			}
 			else
 			{
@@ -246,6 +302,37 @@ namespace LibSequentia.Engine
 			}
 
 			return tinfo;
+		}
+
+		Coroutine m_transitionMonitor;
+
+		/// <summary>
+		/// Transition 감시 시작
+		/// </summary>
+		/// <param name="info"></param>
+		void StartTransitionMonitor(TransitionTimeInfo info)
+		{
+			EndTransitionMonitor();
+
+			m_transitionMonitor	= m_context.StartCoroutine(Co_TransitionMonitor(info));
+		}
+
+		/// <summary>
+		/// Transition감시 중지
+		/// </summary>
+		void EndTransitionMonitor()
+		{
+			if (m_transitionMonitor != null)
+				m_context.StopCoroutine(m_transitionMonitor);
+			m_transitionMonitor	= null;
+		}
+
+		IEnumerator Co_TransitionMonitor(TransitionTimeInfo info)
+		{
+			while (AudioSettings.dspTime < info.transitionEnd)		// 트랜지션 종료 시간이 될 때까지 유지
+				yield return null;
+
+			m_curTransition	= SectionPlayer.TransitionType.None;	// 트랜지션을 하지 않는 상태로 둔다.
 		}
 
 		/// <summary>
@@ -282,6 +369,45 @@ namespace LibSequentia.Engine
 		{
 			currentPlayer.EndSection();
 			sidePlayer.EndSection();
+
+			EndTransitionMonitor();
+		}
+
+		
+		//
+
+		/// <summary>
+		/// 특정 스텝으로 이동
+		/// </summary>
+		/// <param name="step"></param>
+		/// <param name="reverse"></param>
+		public TransitionTimeInfo StepTo(int newstep, bool reverse)
+		{
+			// 정방향인데 진행하려는 스텝이 현재 스텝보다 크지 않거나, 역방향인데 진행하려는 스텝이 현재 스텝보다 작지 않은 경우엔 리턴한다.
+			if (!reverse && newstep <= step || reverse && newstep >= step)
+				return new TransitionTimeInfo() { transitionEnd = -1, transitionStart = -1 };
+
+			var targetTr	= newstep % 2 == 1? SectionPlayer.TransitionType.Natural : SectionPlayer.TransitionType.Manual;
+			var sectionIdx	= newstep / 2 - 1;
+			if (targetTr == SectionPlayer.TransitionType.Natural && !reverse)
+			{
+				// 정방향인데 자연 진행일 경우, 다음에 재생할 sectionIdx는 나누고 버림한 수에 +1을 해줘야한다.
+				// 예를 들어 정방향 진행시 step이 3인 경우, 2로 나누고 버림한 뒤 -1 하면 0이지만 실제로는 두 번째 인덱스([1]) 를 재생해야 하는 것이므로 1을 다시 더해야함.
+				sectionIdx	+= 1;
+			}
+
+			// sectionIdx는 0보다 작을 수 없고, 섹션 갯수보다 많을 수 없다. (섹션 갯수와 같음 == 트랙 종료)
+			if (sectionIdx < 0)					sectionIdx = 0;
+			else if (sectionIdx > sectionCount)	sectionIdx = sectionCount;
+
+			var tinfo		= DoProgress(targetTr, sectionIdx);
+
+			if (tinfo.transitionEnd != -1)	// 트랜지션이 정상적으로 예약된 경우 reverse 설정을 보관
+			{
+				this.reverse	= reverse;
+			}
+
+			return tinfo;
 		}
 	}
 }

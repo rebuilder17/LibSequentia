@@ -48,7 +48,11 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 
 			// 변환 함수 목록
 			ParamInfo.ValueFunc func_linear	= (float input, ParamInfo info) => (info.valueMax - info.valueMin) * input + info.valueMin;
-			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => 1 - (Mathf.Max(info.valueMin, 20 * Mathf.Log10(input)) / info.valueMin);
+			ParamInfo.ValueFunc func_volume	= (float input, ParamInfo info) => 
+				{
+					var input_sin	= Mathf.Sin((input - 0.5f) * Mathf.PI) * 0.5f + 0.5f;
+					return 1 - (Mathf.Max(info.valueMin, 20 * Mathf.Log10(input_sin)) / info.valueMin);
+				};
 
 			//
 			s_infoDict[Automation.TargetParam.Volume]	= new ParamInfo() { valueMin = -80f, valueMax = 0f, mixerParamName = null, valueFunc = func_volume, snapshotNames = new string[] { "VolumeZero", "VolumeFull" } };
@@ -104,7 +108,7 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 				var calcvalue				= info.ToMixerParamValue(value);
 				_temp_snapshot_weight[0]	= 1 - calcvalue;
 				_temp_snapshot_weight[1]	= calcvalue;
-				m_mixer.TransitionToSnapshots(snapshots, _temp_snapshot_weight, 0.01f);
+				m_mixer.TransitionToSnapshots(snapshots, _temp_snapshot_weight, 0.0f);
 			}
 		}
 	}

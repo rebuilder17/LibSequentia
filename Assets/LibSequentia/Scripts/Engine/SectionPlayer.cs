@@ -295,6 +295,14 @@ namespace LibSequentia.Engine
 			firstLoopStartDspTime	= timeLoopStart;
 			nextLoopEndDspTime		= timeNextLoopEnd;
 			
+			// 전환 오토메이션을 미리 앞부분으로 적용해둔다.
+			var auto	= GetAutomation(m_startTransition == TransitionType.Manual? m_sectionData.inTypeManual : m_sectionData.inTypeNatural);
+			if (auto != null)
+			{
+				m_transitionAutomationTarget.Set(auto.targetParam, auto.GetValue(0));
+			}
+
+
 
 			while (AudioSettings.dspTime < timePlay)			// 재생될 때까지 대기
 				yield return null;
@@ -304,9 +312,6 @@ namespace LibSequentia.Engine
 
 			m_state			= State.BeforeFillIn;
 			//Debug.Log(m_state.ToString() + " ... dspTime : " + AudioSettings.dspTime);
-
-
-			var auto	= GetAutomation(m_startTransition == TransitionType.Manual? m_sectionData.inTypeManual : m_sectionData.inTypeNatural);
 
 			if (m_startTransition == TransitionType.Natural)	// 자연 전환일 경우 여기에서 트랜지션
 			{

@@ -57,5 +57,28 @@ namespace LibSequentia.Data
 		{
 			m_autoTarget = control;
 		}
+
+
+		//
+
+		public static Layer CreateFromJSON(JSONObject json, IAudioClipPack clipPack)
+		{
+			var newlayer		= new Layer();
+
+			var clipname		= json.GetField("clip").str;
+			newlayer.clipHandle	= clipPack.GetHandle(clipname);
+
+			json.GetField("tension", (tensionarr) =>
+				{
+					var list	= tensionarr.list;
+					var count	= list.Count;
+					for(int i = 0; i < count; i++)
+					{
+						newlayer.AddTensionAutomation(Engine.Utils.ParseAutomationFromJSON(list[i]));
+					}
+				});
+
+			return newlayer;
+		}
 	}
 }

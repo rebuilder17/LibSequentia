@@ -125,6 +125,37 @@ namespace LibSequentia.Data
 		{
 			return m_layers[index];
 		}
+
+
+
+
+		//
+
+		public static Section CreateFromJSON(JSONObject json, IAudioClipPack clipPack)
+		{
+			var section	= new Section();
+
+			section.inTypeNatural	= Engine.Utils.parseEnum<InType>(json.GetField("natural-in").str);
+			section.inTypeManual	= Engine.Utils.parseEnum<InType>(json.GetField("manual-in").str);
+			section.outTypeNatural	= Engine.Utils.parseEnum<OutType>(json.GetField("natural-out").str);
+			section.outTypeManual	= Engine.Utils.parseEnum<OutType>(json.GetField("manual-out").str);
+
+			section.beatFillIn		= (int)json.GetField("beat-fillin").n;
+			section.beatStart		= (int)json.GetField("beat-start").n;
+			section.beatEnd			= (int)json.GetField("beat-end").n;
+
+			json.GetField("layers", (layerarr) =>
+				{
+					int layeridx	= 0;
+					foreach(var layer in layerarr.list)
+					{
+						section.m_layers[layeridx]	= Layer.CreateFromJSON(layer, clipPack);
+						layeridx++;
+					}
+				});
+
+			return section;
+		}
 	}
 }
 

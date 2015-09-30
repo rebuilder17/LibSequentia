@@ -79,5 +79,37 @@ namespace LibSequentia.Data
 		{
 			m_outroAutomations.Add(auto);
 		}
+
+		
+		//
+
+		public static TransitionScenario CreateFromJSON(JSONObject json)
+		{
+			var scen	= new TransitionScenario();
+
+			json.GetField("intro", (intro) =>
+				{
+					var list	= intro.list;
+					var count	= list.Count;
+					for(var i = 0; i < count; i++)
+					{
+						var auto	= Engine.Utils.ParseAutomationFromJSON(list[i]);
+						scen.AddIntroAutomation(auto);
+					}
+				});
+
+			json.GetField("outro", (outro) =>
+				{
+					var list	= outro.list;
+					var count	= list.Count;
+					for(var i = 0; i < count; i++)
+					{
+						var auto	= Engine.Utils.ParseAutomationFromJSON(list[i]);
+						scen.AddOutroAutomation(auto);
+					}
+				});
+
+			return scen;
+		}
 	}
 }

@@ -38,13 +38,14 @@ public class TestScript : MonoBehaviour
 
 	Track []						m_tracks = new Track[2];
 	int								m_trackIdx = 0;
+	TransitionScenario				m_tscen;
 	
 	void Awake()
 	{
 		// TEST : 버퍼 사이즈를 조절해본다.
 		var audioSettings			= AudioSettings.GetConfiguration();
 		Debug.Log("original buffer size is : " + audioSettings.dspBufferSize);
-		audioSettings.dspBufferSize	= 256;
+		audioSettings.dspBufferSize	= 2048;
 		AudioSettings.Reset(audioSettings);
 		//
 
@@ -116,11 +117,17 @@ public class TestScript : MonoBehaviour
 		//
 
 		m_audioClipDepot	= gameObject.AddComponent<LibSequentiaAudioClipDepot>();
-		var clipPack		= m_audioClipDepot.LoadAndMakeAudioPack("test-sec1-1", "test-sec1-2", "test-sec1-3", "test-sec1-4", "test-sec2-1", "test-sec2-2", "test-sec2-3", "test-sec2-4");
-		var clipPack2		= m_audioClipDepot.LoadAndMakeAudioPack("test2-sec1-1", "test2-sec1-2", "test2-sec1-3", "test2-sec1-4", "test2-sec2-1", "test2-sec2-2", "test2-sec2-3", "test2-sec2-4");
+		
+		var track1json		= new JSONObject(Resources.Load<TextAsset>("data/track1").text);
+		var clipPack		= m_audioClipDepot.LoadAndMakeAudioPack(Track.GatherRequiredClips(track1json));
+		m_tracks[0]			= Track.CreateFromJSON(track1json, clipPack);
 
-		m_tracks[0]			= Track.GenTestTrack(120, clipPack);
-		m_tracks[1]			= Track.GenTestTrack2(120, clipPack2);
+		var track2json		= new JSONObject(Resources.Load<TextAsset>("data/track2").text);
+		var clipPack2		= m_audioClipDepot.LoadAndMakeAudioPack(Track.GatherRequiredClips(track2json));
+		m_tracks[1]			= Track.CreateFromJSON(track2json, clipPack2);
+
+		var tscenjson		= new JSONObject(Resources.Load<TextAsset>("data/ts_crossfade").text);
+		m_tscen				= TransitionScenario.CreateFromJSON(tscenjson);
 
 		var tplayer1		= new TrackPlayer(this);
 
@@ -151,7 +158,7 @@ public class TestScript : MonoBehaviour
 		var deckActrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[0]);
 		var deckBctrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[1]);
 		m_masterplayer.SetTransitionCtrls(deckActrl, deckBctrl);
-		m_masterplayer.SetNewTrack(m_tracks[m_trackIdx]);
+		m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], null);
 		m_masterplayer.tension	= 0;
 	}
 
@@ -208,7 +215,7 @@ public class TestScript : MonoBehaviour
 		{
 			Debug.Log("newtrack");
 			m_trackIdx = (m_trackIdx + 1) % 2;
-			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario2());
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], m_tscen);
 		}
 
 		if (Input.GetKeyDown(KeyCode.Comma))		// < 키 (이전 트랙쪽으로 트랜지션 옮기기)
@@ -259,7 +266,7 @@ public class TestScript : MonoBehaviour
 		{
 			Debug.Log("newtrack");
 			m_trackIdx = (m_trackIdx + 1) % 2;
-			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], TransitionScenario.GenTestScenario2());
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], m_tscen);
 		}
 
 		buttonrect.x	= 0;

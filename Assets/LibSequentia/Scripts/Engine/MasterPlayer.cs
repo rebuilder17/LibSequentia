@@ -26,11 +26,15 @@ namespace LibSequentia.Engine
 				ManualProgress,			// 강제진행
 
 				NewTrack,				// 새 트랙 올리기
-				NewTransitionScenario,	/// 새 트랜지션 시나리오
+				NewTransitionScenario,	// 새 트랜지션 시나리오
+				BothTrack,				// 양쪽 트랙 모두 세팅
+
+				StepTo,					// 특정 스텝으로 이동
 			}
 
 			public Type		type;
 			public object	parameter;
+			public object	parameter2;
 		}
 
 		/// <summary>
@@ -78,9 +82,11 @@ namespace LibSequentia.Engine
 		public double lastCalculatedTransitionTime { get; private set; }
 
 		bool					m_newTrackReady;						// 새로 재생할 (트랜지션할) 트랙이 준비되어있는지 여부
+		bool					m_bothTrackReady;						// 리셋 후 최초 재생 시작시. 양쪽 트랙이 다 준비되었는지 여부
 		bool					m_transitionReserved;					// 전환 효과 예약되었는지 여부
 		SectionPlayer.TransitionType m_transitionType;					// 전환 타입
 		State					m_state;								// 현재 플레이어 상태
+		bool					m_reverse;								// 역진행 여부
 
 		Data.TransitionScenario	m_tranScenario;							// 전환 시나리오
 
@@ -120,6 +126,7 @@ namespace LibSequentia.Engine
 
 
 
+
 		public MasterPlayer(MonoBehaviour context)
 		{
 			m_state		= State.NotPlaying;
@@ -149,13 +156,30 @@ namespace LibSequentia.Engine
 			m_msgQueue.Enqueue(new Message() { type = Message.Type.ManualProgress });
 		}
 
+		public void ProgressStepTo(int step, bool reverse)
+		{
+			m_msgQueue.Enqueue(new Message() { type = Message.Type.StepTo, parameter = step, parameter2 = reverse });
+		}
+
 		/// <summary>
 		/// 새 트랙 올리기. 재생은 하지 않음. 다음번 진행 타이밍에 맞춰서 시작
 		/// </summary>
 		/// <param name="track"></param>
-		public void SetNewTrack(Data.Track track, Data.TransitionScenario trans = null)
+		public void SetNewTrack(Data.Track track, Data.TransitionScenario trans)
 		{
 			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTrack, parameter = track });
+			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans });
+		}
+
+		/// <summary>
+		/// 두 트랙 모두 설정 (초기화 목적)
+		/// </summary>
+		/// <param name="mainTrack"></param>
+		/// <param name="sideTrack"></param>
+		/// <param name="trans"></param>
+		public void SetBothTracks(Data.Track mainTrack, Data.Track sideTrack, Data.TransitionScenario trans)
+		{
+			m_msgQueue.Enqueue(new Message() { type = Message.Type.BothTrack, parameter = mainTrack, parameter2 = sideTrack });
 			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans });
 		}
 
@@ -194,7 +218,7 @@ namespace LibSequentia.Engine
 
 				case Message.Type.NewTrack:
 
-					if (!sidePlayer.isPlaying)	// 반대쪽 플레이어가 현재 재생중이 아닌 경우만 세팅한다.
+					if (!sidePlayer.isPlaying && !m_newTrackReady)	// 반대쪽 플레이어가 현재 재생중이 아닌 경우만 세팅한다.
 					{
 						sidePlayer.SetTrack(msg.parameter as Data.Track, currentPlayer.clock);
 						m_newTrackReady	= true;
@@ -211,6 +235,37 @@ namespace LibSequentia.Engine
 					consume	= true;
 					break;
 
+				case Message.Type.BothTrack:
+					if (m_state != State.NotPlaying)
+					{
+						Debug.LogError("BothTrack message should be used only for initialization purpose.");
+					}
+
+					currentPlayer.SetTrack(msg.parameter as Data.Track);
+					sidePlayer.SetTrack(msg.parameter2 as Data.Track, currentPlayer.clock);
+
+					m_bothTrackReady	= true;
+					m_newTrackReady		= true;
+					consume	= true;
+					break;
+
+				case Message.Type.StepTo:
+					{
+						var step	= (int)msg.parameter;
+						var reverse	= (bool)msg.parameter2;
+						var trtime	= currentPlayer.StepTo(step, reverse);
+						consume		= (trtime.transitionStart >= 0);
+
+						if (consume)
+						{
+							lastCalculatedTransitionTime = trtime.transitionEnd;
+							m_transitionType		= SectionPlayer.TransitionType.Natural;	// NOTE : 현재 이거 무의미해서 그냥 안고치고 이대로 둠....
+							m_transitionReserved	= true;
+							m_reverse				= reverse;
+						}
+					}
+					break;
+
 				default:
 					Debug.LogError("unknown message : " + msg.type);
 					consume	= true;
@@ -225,7 +280,7 @@ namespace LibSequentia.Engine
 		/// </summary>
 		private void ProcessState_NotPlaying()
 		{
-			if (m_newTrackReady)					// 새 트랙이 올라왔다면 바로 처리해준다
+			if (m_newTrackReady && !m_bothTrackReady)	// 새 트랙이 올라왔다면 바로 처리해준다 (단, 두 트랙 모두 초기화한 경우에는 제외)
 			{
 				m_newTrackReady	= false;
 
@@ -235,6 +290,11 @@ namespace LibSequentia.Engine
 			if (m_transitionReserved)				// 트랜지션 시작 => 첫 재생임
 			{
 				m_state			= State.PlayingOneSide;
+
+				// 두 트랙을 모두 초기화한 경우의 플래그는 여기서는 꺼준다.
+				// 위에서 처리가 되지 않았으므로 m_newTrackReady는 여전히 true일 것이고,
+				// 따라서 트랜지션 후 반대쪽 트랙도 재생/트랜지션 시나리오 적용 작업이 이루어질 것임.
+				m_bothTrackReady	= false;
 			}
 		}
 
@@ -252,19 +312,16 @@ namespace LibSequentia.Engine
 					if (lastCalculatedTransitionTime - nextbeat < newclock.SecondPerBeat)	// 다음 비트에 트랜지션이 온다면 새 트랙 재생 시작
 					{
 						SwitchPlayer();
-						currentPlayer.DoInstantProgress();									// fill-in 부분을 생략하고 즉시 재생을 한다.
+						currentPlayer.DoInstantProgress(m_reverse);							// fill-in 부분을 생략하고 즉시 재생을 한다.
 
 						m_state					= State.TransitionReady;					// 스테이트 변화
-
 						m_newTrackReady			= false;
-						m_transitionReserved	= false;
 
 						if (m_tranScenario != null)											// TransitionScenario 준비
 						{
-							// TODO : reverse에 대한 고려가 필요하다. 해당 트랜지션이 리버스인지에 대해서는 트랜지션 시나리오를 초기화하는 과정에서 결정.
-
 							m_tranScenario.SetAutomationTargets(m_trackTransCtrls[m_playerIdx], m_trackTransCtrls[(m_playerIdx + 1) % 2]);
-							transition			= m_tranScenario.reverseTransition? 1 : 0;
+							m_tranScenario.reverseTransition	= m_reverse;
+							//transition			= m_tranScenario.reverseTransition? 1 : 0;
 						}
 					}
 				}
@@ -291,8 +348,7 @@ namespace LibSequentia.Engine
 			if (AudioSettings.dspTime >= lastCalculatedTransitionTime)					// 트랜지션 시간이 되었다면 본격적인 트랜지션 상태로
 			{
 				m_state		= State.OnTransition;
-				
-				// TODO : TransitionScenario 적용
+				m_transitionReserved	= false;
 			}
 		}
 
@@ -307,7 +363,6 @@ namespace LibSequentia.Engine
 				var nextbeat	= clock.CalcNextSafeBeatTime();
 				if (lastCalculatedTransitionTime - nextbeat < clock.SecondPerBeat)		// 다음 비트에 트랜지션한다면
 				{
-					m_transitionReserved	= false;
 					m_state					= State.TransitionFinish;
 				}
 			}
@@ -321,6 +376,7 @@ namespace LibSequentia.Engine
 			if (AudioSettings.dspTime >= lastCalculatedTransitionTime)					// 트랜지션 시간이 되었다면 트랜지션 완전 마무리
 			{
 				m_state	= State.PlayingOneSide;
+				m_transitionReserved	= false;
 
 				if (m_tranScenario != null)												// TransitionScenario 끝내기
 				{
