@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 using LibSequentia.Engine;
 using LibSequentia.Data;
@@ -179,9 +180,42 @@ public class TestScript : MonoBehaviour
 
 
 
+	// Step 이동 테스트
+	struct StepState
+	{
+		public Track	curtrack;
+		public int		step;
+
+		public Track	newtrack;
+		public int		newstep;
+
+		public TransitionScenario tscen;
+	}
+
+	List<StepState>	m_stateSeq	= new List<StepState>();
+	StepState		m_curstate	= new StepState();
+
+
 	void Start()
 	{
-		//m_clock	= new BeatSyncClock(m_track.BPM);
+		var track1	= m_tracks[0];
+		var track2	= m_tracks[1];
+
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 0 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 1 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 2 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 3 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 4 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 5 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 6, newtrack = track2, newstep = 0, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 7, newtrack = track2, newstep = 1, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 8, newtrack = track2, newstep = 2, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 3 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 4 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 5 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 6 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 7 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 8 });
 	}
 	
 
