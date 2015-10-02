@@ -18,7 +18,7 @@ namespace LibSequentia.Engine
 		/// <summary>
 		/// MasterPlayer 내부에서 사용하는 메세지
 		/// </summary>
-		struct Message
+		class Message
 		{
 			public enum Type
 			{
@@ -28,6 +28,7 @@ namespace LibSequentia.Engine
 				NewTrack,				// 새 트랙 올리기
 				NewTransitionScenario,	// 새 트랜지션 시나리오
 				BothTrack,				// 양쪽 트랙 모두 세팅
+				CancelNewTrack,			// 새 트랙 취소하기
 
 				StepTo,					// 특정 스텝으로 이동
 			}
@@ -35,6 +36,57 @@ namespace LibSequentia.Engine
 			public Type		type;
 			public object	parameter;
 			public object	parameter2;
+
+			public bool		ignore;		// 이 메세지를 무시하고 삭제해야 하는 경우엔 true
+			public MessageHandle handle;
+		}
+
+		/// <summary>
+		/// MasterPlayer에 보낸 메세지 개별에 대한 핸들
+		/// </summary>
+		public interface IMessageHandle
+		{
+			/// <summary>
+			/// 메세지가 소비되지 않았을 시의 델리게이트
+			/// </summary>
+			System.Action	notConsumedDelegate		{ set; }
+			/// <summary>
+			/// 메세지가 소비될 때의 델리게이트
+			/// </summary>
+			System.Action	consumedDelegate		{ set; }
+			/// <summary>
+			/// 트랜지션 계열의 메세지일 경우, 해당 트랜지션이 실제로 실행되면 호출된다
+			/// </summary>
+			System.Action transitionDelegate		{ set; }
+
+			/// <summary>
+			/// 해당 메세지를 무시하도록 한다.
+			/// </summary>
+			void SetIgnore();
+		}
+
+		class MessageHandle : IMessageHandle
+		{
+			private Message	m_msg;
+
+			public System.Action notConsumedDelegate { get; set; }
+			public System.Action consumedDelegate { get; set; }
+			public System.Action transitionDelegate { get; set; }
+
+			public MessageHandle(Message msg)
+			{
+				m_msg		= msg;
+				msg.handle	= this;
+			}
+
+			public void SetIgnore()
+			{
+				m_msg.ignore	= true;
+			}
+
+			public void CallNotConsumed() { if (notConsumedDelegate != null) notConsumedDelegate(); }
+			public void CallConsumed() { if (consumedDelegate != null) consumedDelegate(); }
+			public void CallTransition() { if (transitionDelegate != null) transitionDelegate(); }
 		}
 
 		/// <summary>
@@ -82,6 +134,7 @@ namespace LibSequentia.Engine
 		public double lastCalculatedTransitionTime { get; private set; }
 
 		bool					m_newTrackReady;						// 새로 재생할 (트랜지션할) 트랙이 준비되어있는지 여부
+		bool					m_cancelOngoingTrackTransition;			// 현재 트랙 트랜지션 진행중인 경우, 다음 섹션 전환시에 트랙 전환을 하지 않는다.
 		bool					m_bothTrackReady;						// 리셋 후 최초 재생 시작시. 양쪽 트랙이 다 준비되었는지 여부
 		bool					m_transitionReserved;					// 전환 효과 예약되었는지 여부
 		SectionPlayer.TransitionType m_transitionType;					// 전환 타입
@@ -89,6 +142,8 @@ namespace LibSequentia.Engine
 		bool					m_reverse;								// 역진행 여부
 
 		Data.TransitionScenario	m_tranScenario;							// 전환 시나리오
+
+		MessageHandle			m_transitionMsgHandle;					// 트랜지션 계열의 메세지 핸들
 
 
 		/// <summary>
@@ -122,6 +177,17 @@ namespace LibSequentia.Engine
 			}
 		}
 
+		/// <summary>
+		/// 재생중인지 여부
+		/// </summary>
+		public bool isPlaying
+		{
+			get
+			{
+				return m_state != State.NotPlaying;
+			}
+		}
+
 
 
 
@@ -146,29 +212,37 @@ namespace LibSequentia.Engine
 			m_trackTransCtrls[1]	= p2;
 		}
 
-		public void DoNaturalProgress()
+		public IMessageHandle DoNaturalProgress()
 		{
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.NaturalProgress });
+			return EnqueAndMakeHandle(new Message() { type = Message.Type.NaturalProgress });
 		}
 
-		public void DoManualProgress()
+		public IMessageHandle DoManualProgress()
 		{
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.ManualProgress });
+			return EnqueAndMakeHandle(new Message() { type = Message.Type.ManualProgress });
 		}
 
-		public void ProgressStepTo(int step, bool reverse)
+		public IMessageHandle ProgressStepTo(int step, bool reverse)
 		{
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.StepTo, parameter = step, parameter2 = reverse });
+			return EnqueAndMakeHandle(new Message() { type = Message.Type.StepTo, parameter = step, parameter2 = reverse });
+		}
+
+		public IMessageHandle CancelNewTrack()
+		{
+			return EnqueAndMakeHandle(new Message() { type = Message.Type.CancelNewTrack });
 		}
 
 		/// <summary>
 		/// 새 트랙 올리기. 재생은 하지 않음. 다음번 진행 타이밍에 맞춰서 시작
 		/// </summary>
 		/// <param name="track"></param>
-		public void SetNewTrack(Data.Track track, Data.TransitionScenario trans)
+		public IMessageHandle[] SetNewTrack(Data.Track track, Data.TransitionScenario trans)
 		{
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTrack, parameter = track });
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans });
+			return new IMessageHandle[] 
+			{
+				EnqueAndMakeHandle(new Message() { type = Message.Type.NewTrack, parameter = track }),
+				EnqueAndMakeHandle(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans }),
+			};
 		}
 
 		/// <summary>
@@ -177,10 +251,44 @@ namespace LibSequentia.Engine
 		/// <param name="mainTrack"></param>
 		/// <param name="sideTrack"></param>
 		/// <param name="trans"></param>
-		public void SetBothTracks(Data.Track mainTrack, Data.Track sideTrack, Data.TransitionScenario trans)
+		public IMessageHandle[] SetBothTracks(Data.Track mainTrack, Data.Track sideTrack, Data.TransitionScenario trans)
 		{
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.BothTrack, parameter = mainTrack, parameter2 = sideTrack });
-			m_msgQueue.Enqueue(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans });
+			return new IMessageHandle[]
+			{
+				EnqueAndMakeHandle(new Message() { type = Message.Type.BothTrack, parameter = mainTrack, parameter2 = sideTrack }),
+				EnqueAndMakeHandle(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans }),
+			};
+		}
+
+		MessageHandle EnqueAndMakeHandle(Message msg)
+		{
+			m_msgQueue.Enqueue(msg);
+			return new MessageHandle(msg);
+		}
+
+		/// <summary>
+		/// 트랜지션 계열의 메세지일 경우 현재 트랜지션 메세지 핸들을 세팅
+		/// </summary>
+		/// <param name="msg"></param>
+		void CheckAndSetTransitionMessageHandle(ref Message msg)
+		{
+			var type	= msg.type;
+			if (type == Message.Type.ManualProgress || type == Message.Type.NaturalProgress || type == Message.Type.StepTo)
+			{
+				m_transitionMsgHandle	= msg.handle;
+			}
+		}
+
+		/// <summary>
+		/// Transition Message Handle의 트랜지션 콜백을 실행하고 레퍼런스를 지움
+		/// </summary>
+		void CallTransitionMessageHandle()
+		{
+			if (m_transitionMsgHandle != null)
+			{
+				m_transitionMsgHandle.CallTransition();
+				m_transitionMsgHandle	= null;
+			}
 		}
 
 		private bool ProcessMessage(ref Message msg)
@@ -266,6 +374,23 @@ namespace LibSequentia.Engine
 					}
 					break;
 
+				case Message.Type.CancelNewTrack:
+					if (m_state == State.PlayingOneSide && !m_transitionReserved)		// 트랜지션 예약이 되지 않았고, 한쪽 트랙 재생중인 시점에서는 m_newTrackReady를 꺼주면 됨
+					{
+						m_newTrackReady	= false;
+						consume			= true;
+					}
+					else if (m_state == State.OnTransition && !m_transitionReserved)	// 트랜지션 예약이 되지 않았고, 현재 트랙 전환중일 경우, m_cancelOngoingTrackTransition을 켜주면 됨
+					{
+						m_cancelOngoingTrackTransition	= true;
+						consume			= true;
+					}
+					else
+					{
+						consume			= false;
+					}
+					break;
+
 				default:
 					Debug.LogError("unknown message : " + msg.type);
 					consume	= true;
@@ -323,6 +448,8 @@ namespace LibSequentia.Engine
 							m_tranScenario.reverseTransition	= m_reverse;
 							//transition			= m_tranScenario.reverseTransition? 1 : 0;
 						}
+
+						CallTransitionMessageHandle();										// 트랜지션 실행 콜백
 					}
 				}
 				else
@@ -357,6 +484,12 @@ namespace LibSequentia.Engine
 		/// </summary>
 		private void ProcessState_OnTransition()
 		{
+			if (m_cancelOngoingTrackTransition)			// 요쳥이 있을 시 다음 트랙 재생이 되지 않도록 한다. 
+			{
+				SwitchPlayer();							//(플레이어를 전환하면 자연스레 다음 트랙이 전환되어 종료될 트랙이 됨)
+				m_cancelOngoingTrackTransition	= false;
+			}
+
 			if (m_transitionReserved)					// 트랜지션 예약되었을 시
 			{
 				var clock		= currentPlayer.clock;
@@ -364,6 +497,7 @@ namespace LibSequentia.Engine
 				if (lastCalculatedTransitionTime - nextbeat < clock.SecondPerBeat)		// 다음 비트에 트랜지션한다면
 				{
 					m_state					= State.TransitionFinish;
+					CallTransitionMessageHandle();		// 트랜지션 실행 콜백
 				}
 			}
 		}
@@ -398,14 +532,18 @@ namespace LibSequentia.Engine
 				{
 					var msg	= m_msgQueue.Peek();
 
-					if (ProcessMessage(ref msg))		// 메세지를 정상적으로 처리하면 큐에서 삭제
+					if (msg.ignore || ProcessMessage(ref msg))			// 메세지를 정상적으로 처리하면 큐에서 삭제
 					{
-						Debug.Log(msg.type.ToString() + " message consumed");
+						Debug.Log(msg.type.ToString() + " message " + (msg.ignore? "ignored" : "consumed"));
 						m_msgQueue.Dequeue();
+
+						CheckAndSetTransitionMessageHandle(ref msg);	// 트랜지션 메세지인지 보고 세팅
+						msg.handle.CallConsumed();						// 콜백 실행
 					}
 					else
 					{
 						Debug.Log(msg.type.ToString() + " message not consumed...");
+						msg.handle.CallNotConsumed();					// 콜백 실행
 						yield return null;
 					}
 				}
