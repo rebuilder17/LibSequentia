@@ -276,6 +276,7 @@ namespace LibSequentia.Engine
 			if (type == Message.Type.ManualProgress || type == Message.Type.NaturalProgress || type == Message.Type.StepTo)
 			{
 				m_transitionMsgHandle	= msg.handle;
+				Debug.Log("transition message in : " + type);
 			}
 		}
 
@@ -286,6 +287,7 @@ namespace LibSequentia.Engine
 		{
 			if (m_transitionMsgHandle != null)
 			{
+				Debug.Log("calling transition message handle callback");
 				m_transitionMsgHandle.CallTransition();
 				m_transitionMsgHandle	= null;
 			}
@@ -446,7 +448,7 @@ namespace LibSequentia.Engine
 						{
 							m_tranScenario.SetAutomationTargets(m_trackTransCtrls[m_playerIdx], m_trackTransCtrls[(m_playerIdx + 1) % 2]);
 							m_tranScenario.reverseTransition	= m_reverse;
-							//transition			= m_tranScenario.reverseTransition? 1 : 0;
+							transition			= 0;
 						}
 
 						CallTransitionMessageHandle();										// 트랜지션 실행 콜백
@@ -458,6 +460,8 @@ namespace LibSequentia.Engine
 					{
 						m_transitionReserved	= false;
 						m_state					= State.PlayingOneSide;
+
+						CallTransitionMessageHandle();										// 트랜지션 실행 콜백
 					}
 				}
 			}

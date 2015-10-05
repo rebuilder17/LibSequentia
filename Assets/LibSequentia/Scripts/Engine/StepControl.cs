@@ -65,6 +65,8 @@ namespace LibSequentia.Engine
 			System.Action	m_stepmove_consume_callback;
 			System.Action	m_transition_callback;
 
+			bool		m_wasNaturalTransition = false;
+
 			public int targetStep { get { return m_targetStep; } }
 			public bool reverse { get { return m_reverse; } }
 
@@ -77,6 +79,10 @@ namespace LibSequentia.Engine
 				m_reverse		= reverse;
 				m_newTrack		= newtrack;
 				m_trans			= trans;
+
+				m_wasNaturalTransition	= (targetStep % 2 == 1);
+
+				Debug.Log(string.Format("[stepmove setup] targetStep : {0} reverse : {1} ... ctrl.m_newTrackIsOn : {2}", targetStep, reverse, ctrl.m_newTrackIsOn));
 			}
 
 			protected override bool OnStart()
@@ -88,6 +94,7 @@ namespace LibSequentia.Engine
 						{
 							ctrl.m_newTrackIsOn	= true;
 							ctrl.m_newTrackStep	= m_reverse? m_newTrack.sectionCount * 2 : 2;
+							Debug.Log("m_newTrackIsOn : true, m_newTrackStep : " + ctrl.m_newTrackStep);
 						};
 				}
 
@@ -114,6 +121,11 @@ namespace LibSequentia.Engine
 							// 이 요청이 새 트랙 재생을 요구하거나 (그래서 지금 올라온 새 트랙은 현재 재생중인 것이 아님), 기존에 새 트랙이 없을 시엔 curTrackStep을 건드린다.
 							// 트랙 트랜지션 상태에서 다시 반대방향으로 빠져나가는 경우엔 앞선 요청에서 (cancelTrack) m_newTrackIsOn 을 false로 두었으므로 별도 조건은 없어도 된다.
 							ctrl.m_curTrackStep		= m_targetStep;
+							//if (m_targetStep % 2 == 1)	// 자연 진행일 경우, m_curTrackStep은 강제 진행시의 step 인덱스로 세팅해줘야한다.
+							//{
+							//	ctrl.m_curTrackStep += m_reverse? -1 : 1;
+							//}
+							Debug.Log("m_curTrackStep <- m_targetStep : " + ctrl.m_curTrackStep);
 						}
 						else
 						{
@@ -125,10 +137,17 @@ namespace LibSequentia.Engine
 				//
 				m_transition_callback = () =>	// * MoveOnceMore 에서 같은 콜백을 호출할 수 있도록 보관해둔다.
 					{
-						if (m_newTrack == null)							// 이 요청이 새 트랙 재생을 요구하지 않은 경우,
+						if (m_newTrack == null && ctrl.m_newTrackIsOn)	// 이 요청이 새 트랙 재생을 요구하지 않은 경우, 진행중이던 새 트랙이 만약 있었다면
 						{
-							ctrl.m_newTrackIsOn = false;				// 진행중이던 새 트랙이 만약 있었다면 트랜지션 후 그 트랙으로 넘어갔을 것이기에 플래그를 꺼준다.
+							ctrl.m_newTrackIsOn = false;				// 트랜지션 후 그 트랙으로 넘어갔을 것이기에 플래그를 꺼준다.
 							ctrl.m_curTrackStep	= ctrl.m_newTrackStep;	// 스텝도 이제부터는 기존에 새로 올라갔던 트랙의 스텝을 따라가야함
+							Debug.Log("m_curTrackStep <- m_newTrackStep : " + ctrl.m_newTrackStep);
+						}
+
+						if (m_wasNaturalTransition)						// 자연 트랜지션이었을 경우, 현재 스텝을 더해준다
+						{
+							ctrl.m_curTrackStep++;
+							Debug.Log("(because of m_wasNaturalTransition) ctrl.m_curTrackStep++ : " + ctrl.m_curTrackStep);
 						}
 
 						ctrl.m_lastMoveWasReversed	= m_reverse;		// 진행 방향도 저장
@@ -151,8 +170,8 @@ namespace LibSequentia.Engine
 				if (m_reverse != reverse || m_targetStep % 2 != 1)
 					return false;
 
-				m_targetStep++;
-				var handle	= player.ProgressStepTo(m_targetStep, m_reverse);
+				//m_targetStep++;
+				var handle	= player.ProgressStepTo(m_targetStep + 1, m_reverse);
 				// 이쪽 방향 콜백은 원래의 것을 그대로 사용한다.
 				handle.consumedDelegate		= m_stepmove_consume_callback;
 				handle.transitionDelegate	= m_transition_callback;
@@ -205,9 +224,13 @@ namespace LibSequentia.Engine
 
 				player.SetNewTrack(m_newTrack, null);
 				var handle		= player.ProgressStepTo(startstep, m_reverse);
-				handle.transitionDelegate = () =>
+				handle.consumedDelegate	= () =>
 					{
 						ctrl.m_curTrackStep	= nextstep;
+					};
+				handle.transitionDelegate = () =>
+					{
+						Debug.Log("transition over - next step : " + nextstep);
 						isComplete	= true;
 					};
 
@@ -223,6 +246,26 @@ namespace LibSequentia.Engine
 		MonoBehaviour		m_context;
 		MasterPlayer		m_player;
 		Queue<BaseRequest>	m_reqQueue	= new Queue<BaseRequest>();
+
+		struct Command
+		{
+			public enum Type
+			{
+				StartWithOneTrack,
+				StartWithTwoTrack,
+				StepMove,
+			}
+
+			public Type	type;
+			public object param1;
+			public object param2;
+			public object param3;
+			public object param4;
+			public object param5;
+		}
+
+		Queue<Command>		m_cmdQueue	= new Queue<Command>();	// 명령 큐 (MessageQueue 만으로는 해결되지 않는 명령 중첩 문제가 있어서)
+
 
 		int					m_curTrackStep;			// 현재 트랙의 step
 		int					m_newTrackStep;			// 새 트랙의 step
@@ -244,6 +287,29 @@ namespace LibSequentia.Engine
 			{
 				yield return null;
 
+				// 커맨드 큐에 들어온 명령어가 있고, 메세지 큐에 쌓인 메세지가 일정 수 이하일 때만 처리
+				if (m_cmdQueue.Count > 0 && m_reqQueue.Count < 2)
+				{
+					var cmd	= m_cmdQueue.Dequeue();
+					switch(cmd.type)
+					{
+						case Command.Type.StartWithOneTrack:
+							_StartWithOneTrack((Data.Track)cmd.param1, (int)cmd.param2, (bool)cmd.param3);
+							break;
+
+						case Command.Type.StartWithTwoTrack:
+							_StartWithTwoTrack((Data.Track)cmd.param1, (int)cmd.param2, (Data.Track)cmd.param3, (Data.TransitionScenario)cmd.param4, (bool)cmd.param5);
+							break;
+
+						case Command.Type.StepMove:
+							_StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (bool)cmd.param4);
+							break;
+
+						default:
+							throw new System.InvalidOperationException("unknown command type " + cmd.type);
+					}
+				}
+
 				if (m_reqQueue.Count > 0)
 				{
 					var req	= m_reqQueue.Peek();		// 가장 최근의 요청을 가져오고
@@ -253,6 +319,7 @@ namespace LibSequentia.Engine
 					if (req.isComplete)					// 완료된 요청은 제거한다.
 					{
 						m_reqQueue.Dequeue();
+						Debug.Log("dequeue");
 					}
 				}
 			}
@@ -266,7 +333,14 @@ namespace LibSequentia.Engine
 		/// <param name="track"></param>
 		public void StartWithOneTrack(Data.Track track, int startStep, bool reverse = false)
 		{
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StartWithOneTrack, param1 = track, param2 = startStep, param3 = reverse });
+		}
 
+		void _StartWithOneTrack(Data.Track track, int startStep, bool reverse = false)
+		{
+			var newreq		= new NewStartOneTrackRequest(this);
+			newreq.Setup(track, reverse);
+			m_reqQueue.Enqueue(newreq);
 		}
 
 		/// <summary>
@@ -274,16 +348,21 @@ namespace LibSequentia.Engine
 		/// </summary>
 		public void StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, Data.TransitionScenario transcen, bool reverse = false)
 		{
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StartWithTwoTrack, param1 = mainTrack, param2 = startStep, param3 = sideTrack, param4 = transcen, param5 = reverse });
+		}
 
+		void _StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, Data.TransitionScenario transcen, bool reverse = false)
+		{
+			
 		}
 
 		/// <summary>
 		/// 트랜지션 단계 진행
 		/// </summary>
 		/// <param name="reverse"></param>
-		public void StepMove(bool reverse = false)
+		public void StepMove(int step, bool reverse = false)
 		{
-			StepMove(null, null, reverse);
+			StepMove(step, null, null, reverse);
 		}
 
 		/// <summary>
@@ -292,8 +371,20 @@ namespace LibSequentia.Engine
 		/// <param name="newTrack"></param>
 		/// <param name="transcen"></param>
 		/// <param name="reverse"></param>
-		public void StepMove(Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
+		public void StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
 		{
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StepMove, param1 = step, param2 = newTrack, param3 = transcen, param4 = reverse });
+		}
+
+		void _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
+		{
+			//if ((m_newTrackIsOn? m_newTrackStep : m_curTrackStep) == step)
+			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
+			{
+				Debug.LogWarning("same step");
+				return;
+			}
+
 			// 현재 진행중인 요청이 stepmove고, 한번 더 진행이 가능한 경우에는 따로 요청을 늘리지 않는다. (자연 -> 강제 전환으로 바꾸는 것임)
 			var stepMoveReq	= m_reqQueue.Count > 0 ? m_reqQueue.Peek() as StepMoveRequest : null;
 			if (stepMoveReq != null && stepMoveReq.MoveOnceMore(reverse))
@@ -302,9 +393,9 @@ namespace LibSequentia.Engine
 			}
 
 			var newreq		= new StepMoveRequest(this);
-			var newstep		= m_newTrackIsOn? m_newTrackStep : m_curTrackStep;
-			newstep			+= reverse? -1 : 1;
-			newreq.Setup(newstep, reverse, newTrack, transcen);
+			//var newstep		= m_newTrackIsOn? m_newTrackStep : m_curTrackStep;
+			//newstep			+= reverse? -1 : 1;
+			newreq.Setup(step, reverse, newTrack, transcen);
 
 			m_reqQueue.Enqueue(newreq);
 		}

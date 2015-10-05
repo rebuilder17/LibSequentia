@@ -159,7 +159,8 @@ public class TestScript : MonoBehaviour
 		var deckActrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[0]);
 		var deckBctrl		= m_automationMgr.GetAutomationControlToSingleMixer(autoctrlDeckNames[1]);
 		m_masterplayer.SetTransitionCtrls(deckActrl, deckBctrl);
-		m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], null);
+		
+		//m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], null);
 		m_masterplayer.tension	= 0;
 	}
 
@@ -194,6 +195,94 @@ public class TestScript : MonoBehaviour
 
 	List<StepState>	m_stateSeq	= new List<StepState>();
 	StepState		m_curstate	= new StepState();
+	int				m_stateidx	= 0;
+	StepControl		m_ctrl;
+
+	void NextStep()
+	{
+		if (m_stateidx == 0)
+		{
+			m_ctrl.StartWithOneTrack(m_stateSeq[0].curtrack, 1, false);
+		}
+		else if (m_stateidx >= m_stateSeq.Count)
+		{
+			m_ctrl.StepMove(m_stateSeq[m_stateSeq.Count - 1].step + 1, false);
+		}
+		else
+		{
+			var cur		= m_stateSeq[m_stateidx];
+			if (cur.newtrack != null && m_curstate.newtrack == null)
+			{
+				Debug.LogWarning("newtrack!");
+				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, false);
+			}
+			else if (cur.newtrack != null && m_curstate.newtrack != null)
+			{
+				if (cur.newstep >= 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				{
+					m_ctrl.StepMove(cur.newstep, false);
+				}
+				else
+				{
+					m_ctrl.StepMove(cur.step, false);
+				}
+			}
+	
+			else
+			{
+				m_ctrl.StepMove(cur.step, false);
+			}
+		}
+
+		if (m_stateidx < m_stateSeq.Count)
+		{
+			m_curstate = m_stateSeq[m_stateidx];
+			m_stateidx++;
+		}
+	}
+
+	void PrevStep()
+	{
+		return;//
+
+		m_stateidx--;
+
+		if (m_stateidx >= m_stateSeq.Count - 1)
+		{
+			var last	= m_stateSeq[m_stateSeq.Count - 1];
+			m_ctrl.StartWithOneTrack(last.curtrack, last.step, true);
+		}
+		else if (m_stateidx < 0)
+		{
+			m_ctrl.StepMove(0, true);
+		}
+		else
+		{
+			var cur		= m_stateSeq[m_stateidx];
+			if (cur.newtrack != null && m_curstate.newtrack == null)
+			{
+				Debug.LogWarning("newtrack! (reverse)");
+				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, true);
+			}
+			else if (cur.newtrack != null && m_curstate.newtrack != null)
+			{
+				if (cur.step <= cur.curtrack.sectionCount * 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				{
+					m_ctrl.StepMove(cur.step, true);
+				}
+				else
+				{
+					m_ctrl.StepMove(cur.newstep, true);
+				}
+			}
+	
+			else
+			{
+				m_ctrl.StepMove(cur.step, true);
+			}
+		}
+	}
+
 
 
 	void Start()
@@ -201,26 +290,36 @@ public class TestScript : MonoBehaviour
 		var track1	= m_tracks[0];
 		var track2	= m_tracks[1];
 
-		m_stateSeq.Add(new StepState() { curtrack = track1, step = 0 });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 1 });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 2 });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 3 });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 4 });
-		m_stateSeq.Add(new StepState() { curtrack = track1, step = 5 });
-		m_stateSeq.Add(new StepState() { curtrack = track1, step = 6, newtrack = track2, newstep = 0, tscen = m_tscen });
-		m_stateSeq.Add(new StepState() { curtrack = track1, step = 7, newtrack = track2, newstep = 1, tscen = m_tscen });
-		m_stateSeq.Add(new StepState() { curtrack = track2, step = 8, newtrack = track2, newstep = 2, tscen = m_tscen });
-		m_stateSeq.Add(new StepState() { curtrack = track2, step = 3 });
-		m_stateSeq.Add(new StepState() { curtrack = track2, step = 4 });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 5, newtrack = track2, newstep = 1, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 6, newtrack = track2, newstep = 2, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 7, newtrack = track2, newstep = 3, tscen = m_tscen });
+		m_stateSeq.Add(new StepState() { curtrack = track1, step = 4 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 5 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 6 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 7 });
-		m_stateSeq.Add(new StepState() { curtrack = track2, step = 8 });
+
+		foreach(var entry in m_stateSeq)
+		{
+			Debug.Log("newtrack : " + string.Format("{0}", entry.newtrack));
+		}
+
+		m_ctrl	= new StepControl(m_masterplayer, this);
 	}
 	
 
 	void Update()
 	{
+		if (Input.GetKeyDown(KeyCode.Quote))
+		{
+			NextStep();
+		}
+
+
+		/*
 		if (Input.GetKeyDown(KeyCode.N))			// 자연 진행
 		{
 			Debug.Log("Natural Transition");
@@ -233,6 +332,16 @@ public class TestScript : MonoBehaviour
 			m_masterplayer.DoManualProgress();
 		}
 
+
+		if (Input.GetKeyDown(KeyCode.C))			// C 키 : 다음 트랙 준비
+		{
+			Debug.Log("newtrack");
+			m_trackIdx = (m_trackIdx + 1) % 2;
+			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], m_tscen);
+		}
+		 */
+
+		
 		if(Input.GetKeyDown(KeyCode.Equals))		// '+' 키 (텐션 업)
 		{
 			m_tension	= Mathf.Min(1f, m_tension + 0.1f);
@@ -245,13 +354,6 @@ public class TestScript : MonoBehaviour
 			m_masterplayer.tension	= m_tension;
 		}
 
-		if (Input.GetKeyDown(KeyCode.C))			// C 키 : 다음 트랙 준비
-		{
-			Debug.Log("newtrack");
-			m_trackIdx = (m_trackIdx + 1) % 2;
-			m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], m_tscen);
-		}
-
 		if (Input.GetKeyDown(KeyCode.Comma))		// < 키 (이전 트랙쪽으로 트랜지션 옮기기)
 		{
 			m_masterplayer.transition	= Mathf.Max(0, m_masterplayer.transition - 0.1f);
@@ -261,10 +363,12 @@ public class TestScript : MonoBehaviour
 		{
 			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
 		}
+		 
 	}
 
 	void OnGUI()
 	{
+		/*
 		var buttonrect	= new Rect() { x = 0, y = 0, width = 200, height = 100 };
 		if (GUI.Button(buttonrect, "Natural"))			// 자연 진행
 		{
@@ -315,5 +419,6 @@ public class TestScript : MonoBehaviour
 		{
 			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
 		}
+		 */
 	}
 }
