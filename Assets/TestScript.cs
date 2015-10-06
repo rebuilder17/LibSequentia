@@ -194,7 +194,7 @@ public class TestScript : MonoBehaviour
 	}
 
 	List<StepState>	m_stateSeq	= new List<StepState>();
-	StepState		m_curstate	= new StepState();
+	//StepState		m_curstate	= new StepState();
 	int				m_stateidx	= 0;
 	StepControl		m_ctrl;
 
@@ -210,13 +210,14 @@ public class TestScript : MonoBehaviour
 		}
 		else
 		{
+			var prev	= m_stateSeq[m_stateidx - 1];
 			var cur		= m_stateSeq[m_stateidx];
-			if (cur.newtrack != null && m_curstate.newtrack == null)
+			if (cur.newtrack != null && prev.newtrack == null)
 			{
 				Debug.LogWarning("newtrack!");
 				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, false);
 			}
-			else if (cur.newtrack != null && m_curstate.newtrack != null)
+			else if (cur.newtrack != null && prev.newtrack != null)
 			{
 				if (cur.newstep >= 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
 				{
@@ -236,16 +237,17 @@ public class TestScript : MonoBehaviour
 
 		if (m_stateidx < m_stateSeq.Count)
 		{
-			m_curstate = m_stateSeq[m_stateidx];
 			m_stateidx++;
 		}
 	}
 
 	void PrevStep()
 	{
-		return;//
-
-		m_stateidx--;
+		if (m_stateidx > 0)
+		{
+			m_stateidx--;
+		}
+		
 
 		if (m_stateidx >= m_stateSeq.Count - 1)
 		{
@@ -258,13 +260,14 @@ public class TestScript : MonoBehaviour
 		}
 		else
 		{
+			var prev	= m_stateSeq[m_stateidx + 1];
 			var cur		= m_stateSeq[m_stateidx];
-			if (cur.newtrack != null && m_curstate.newtrack == null)
+			if (cur.newtrack != null && prev.newtrack == null)
 			{
 				Debug.LogWarning("newtrack! (reverse)");
 				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, true);
 			}
-			else if (cur.newtrack != null && m_curstate.newtrack != null)
+			else if (cur.newtrack != null && prev.newtrack != null)
 			{
 				if (cur.step <= cur.curtrack.sectionCount * 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
 				{
@@ -302,11 +305,6 @@ public class TestScript : MonoBehaviour
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 6 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 7 });
 
-		foreach(var entry in m_stateSeq)
-		{
-			Debug.Log("newtrack : " + string.Format("{0}", entry.newtrack));
-		}
-
 		m_ctrl	= new StepControl(m_masterplayer, this);
 	}
 	
@@ -316,6 +314,14 @@ public class TestScript : MonoBehaviour
 		if (Input.GetKeyDown(KeyCode.Quote))
 		{
 			NextStep();
+		}
+
+		if (Input.GetKeyDown(KeyCode.Semicolon))
+		{
+			if (m_stateidx == 0)
+				m_stateidx = m_stateSeq.Count;
+
+			PrevStep();
 		}
 
 

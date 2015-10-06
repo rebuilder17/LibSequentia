@@ -146,7 +146,7 @@ namespace LibSequentia.Engine
 
 						if (m_wasNaturalTransition)						// 자연 트랜지션이었을 경우, 현재 스텝을 더해준다
 						{
-							ctrl.m_curTrackStep++;
+							ctrl.m_curTrackStep += m_reverse? -1 : 1;
 							Debug.Log("(because of m_wasNaturalTransition) ctrl.m_curTrackStep++ : " + ctrl.m_curTrackStep);
 						}
 
@@ -171,7 +171,7 @@ namespace LibSequentia.Engine
 					return false;
 
 				//m_targetStep++;
-				var handle	= player.ProgressStepTo(m_targetStep + 1, m_reverse);
+				var handle	= player.ProgressStepTo(m_targetStep + (m_reverse? -1 : 1), m_reverse);
 				// 이쪽 방향 콜백은 원래의 것을 그대로 사용한다.
 				handle.consumedDelegate		= m_stepmove_consume_callback;
 				handle.transitionDelegate	= m_transition_callback;
@@ -219,8 +219,8 @@ namespace LibSequentia.Engine
 				ctrl.m_newTrackIsOn	= false;
 				ctrl.m_lastMoveWasReversed	= false;
 
-				var startstep	= m_reverse? (m_newTrack.sectionCount + 1) : 1;	// 시작은 자연진행으로 (홀수 스텝)
-				var nextstep	= m_reverse? startstep - 1 : startstep + 1;		// 완전히 진행된 후의 스텝
+				var startstep	= m_reverse? (m_newTrack.sectionCount + 1) * 2 - 1 : 1;	// 시작은 자연진행으로 (홀수 스텝)
+				var nextstep	= m_reverse? startstep - 1 : startstep + 1;				// 완전히 진행된 후의 스텝
 
 				player.SetNewTrack(m_newTrack, null);
 				var handle		= player.ProgressStepTo(startstep, m_reverse);
@@ -379,6 +379,7 @@ namespace LibSequentia.Engine
 		void _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
 		{
 			//if ((m_newTrackIsOn? m_newTrackStep : m_curTrackStep) == step)
+			Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
 			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
 			{
 				Debug.LogWarning("same step");

@@ -114,20 +114,18 @@ namespace LibSequentia.Engine
 		/// 현재 재생중인 트랙의 인덱스 = 버림(진행도 / 2) - 1.
 		/// 즉 아무것도 재생중인 경우가 아닐 시 0, 첫 번째 섹션이 재생중일 때는 2, 그 다음은 4, ...
 		/// </summary>
-		public int step
+		private int CalcStep(bool reverse)
 		{
-			get
+			var stepcalc	= (m_sectionIdx + 1) * 2;						// 현재의 sectionIdx 기준으로 우선 계산
+			if (m_curTransition == SectionPlayer.TransitionType.Natural)	// 자연 진행이 걸린 경우 홀수값으로 리턴해줘야한다.
 			{
-				var stepcalc	= m_sectionIdx * 2 + 1;							// 현재의 sectionIdx 기준으로 우선 계산
-				if (m_curTransition == SectionPlayer.TransitionType.Natural)	// 자연 진행이 걸린 경우 홀수값으로 리턴해줘야한다.
-				{
-					// 정방향의 경우 다음에 올라가야하므로 -1 해줘야하고,
-					// 역방향의 경우 다음에 내려가야하므로 1 더해준다
-					stepcalc	+= reverse? 1 : -1;
-				}
-
-				return stepcalc;
+				// 정방향의 경우 다음에 올라가야하므로 -1 해줘야하고,
+				// 역방향의 경우 다음에 내려가야하므로 1 더해준다
+				stepcalc	+= reverse? 1 : -1;
 			}
+			//Debug.Log("CalcStep result : " + stepcalc);
+
+			return stepcalc;
 		}
 
 		SectionPlayer.TransitionType	m_curTransition;
@@ -203,7 +201,7 @@ namespace LibSequentia.Engine
 		public TransitionTimeInfo DoNaturalProgress(bool suppressProgress = false)
 		{
 			m_suppressProgress	= suppressProgress;
-			return DoProgress(SectionPlayer.TransitionType.Natural);
+			return DoProgress(SectionPlayer.TransitionType.Natural, false);
 		}
 
 		/// <summary>
@@ -214,7 +212,7 @@ namespace LibSequentia.Engine
 		public TransitionTimeInfo DoManualProgress(bool suppressProgress = false)
 		{
 			m_suppressProgress	= suppressProgress;
-			return DoProgress(SectionPlayer.TransitionType.Manual);
+			return DoProgress(SectionPlayer.TransitionType.Manual, false);
 		}
 
 		/// <summary>
@@ -224,7 +222,7 @@ namespace LibSequentia.Engine
 		public TransitionTimeInfo DoInstantProgress(bool reverse)
 		{
 			var sectionIdx	= reverse? m_track.sectionCount - 1 : 0;
-			var tinfo		= DoProgress(SectionPlayer.TransitionType.Instant, sectionIdx);
+			var tinfo		= DoProgress(SectionPlayer.TransitionType.Instant, reverse, sectionIdx);
 
 			if (tinfo.transitionEnd != -1)		// 트랜지션이 정상적으로 예약된 경우 reverse 설정을 보관
 			{
@@ -233,7 +231,7 @@ namespace LibSequentia.Engine
 			return tinfo;
 		}
 
-		TransitionTimeInfo DoProgress(SectionPlayer.TransitionType ttype, int sectionIdxOverride = int.MinValue)
+		TransitionTimeInfo DoProgress(SectionPlayer.TransitionType ttype, bool reverse, int sectionIdxOverride = int.MinValue)
 		{
 			// 트랜지션을 해도 괜찮은 상황인지 체크
 
@@ -270,7 +268,8 @@ namespace LibSequentia.Engine
 			if (!sidePlayer.isOnTransition
 				&& (int)ttype > (int)sidePlayer.currentEndTransition)
 			{
-				if(m_sectionIdx > 0 && !m_suppressProgress)	// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
+				if(((!reverse && m_sectionIdx > 0) || (reverse && m_sectionIdx < m_track.sectionCount - 1))
+					&& !m_suppressProgress)					// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
 				{
 					tinfo.transitionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
 				}
@@ -280,7 +279,7 @@ namespace LibSequentia.Engine
 				}
 
 
-				if (m_sectionIdx < m_track.sectionCount)
+				if ((!reverse && m_sectionIdx < m_track.sectionCount) || (reverse && m_sectionIdx >= 0))	// 더 진행할 섹션이 있는 경우에만
 				{
 					Debug.LogWarning("start : " + ttype);
 					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, tinfo.transitionStart);
@@ -384,7 +383,9 @@ namespace LibSequentia.Engine
 		public TransitionTimeInfo StepTo(int newstep, bool reverse)
 		{
 			// 정방향인데 진행하려는 스텝이 현재 스텝보다 크지 않거나, 역방향인데 진행하려는 스텝이 현재 스텝보다 작지 않은 경우엔 리턴한다.
-			if (!reverse && newstep <= step || reverse && newstep >= step)
+			// 단 step이 음수인 경우엔 해당하지 않음 (아직 재생된 적이 없는 것임)
+			var curstep	= CalcStep(reverse);
+			if (m_sectionIdx >= 0 && (!reverse && newstep <= curstep || reverse && newstep >= curstep))
 				return new TransitionTimeInfo() { transitionEnd = -1, transitionStart = -1 };
 
 			var targetTr	= newstep % 2 == 1? SectionPlayer.TransitionType.Natural : SectionPlayer.TransitionType.Manual;
@@ -400,7 +401,7 @@ namespace LibSequentia.Engine
 			if (sectionIdx < 0)					sectionIdx = 0;
 			else if (sectionIdx > sectionCount)	sectionIdx = sectionCount;
 
-			var tinfo		= DoProgress(targetTr, sectionIdx);
+			var tinfo		= DoProgress(targetTr, reverse, sectionIdx);
 
 			if (tinfo.transitionEnd != -1)	// 트랜지션이 정상적으로 예약된 경우 reverse 설정을 보관
 			{

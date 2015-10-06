@@ -439,6 +439,7 @@ namespace LibSequentia.Engine
 					if (lastCalculatedTransitionTime - nextbeat < newclock.SecondPerBeat)	// 다음 비트에 트랜지션이 온다면 새 트랙 재생 시작
 					{
 						SwitchPlayer();
+						Debug.LogWarning("m_reverse : " + m_reverse);
 						currentPlayer.DoInstantProgress(m_reverse);							// fill-in 부분을 생략하고 즉시 재생을 한다.
 
 						m_state					= State.TransitionReady;					// 스테이트 변화
@@ -448,7 +449,7 @@ namespace LibSequentia.Engine
 						{
 							m_tranScenario.SetAutomationTargets(m_trackTransCtrls[m_playerIdx], m_trackTransCtrls[(m_playerIdx + 1) % 2]);
 							m_tranScenario.reverseTransition	= m_reverse;
-							transition			= 0;
+							transition			= m_tranScenario.reverseTransition? 1 : 0;
 						}
 
 						CallTransitionMessageHandle();										// 트랜지션 실행 콜백

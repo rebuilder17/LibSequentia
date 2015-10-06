@@ -21,8 +21,8 @@ namespace LibSequentia.Data
 		float				m_transitionRatio;								// 전환 비율
 
 		/// <summary>
-		/// 역전환인지 여부. true일 경우 전환 비율을 반대로 적용한다. (0~1 -> 1~0)
-		/// 전환 비율을 설정할 시에는 보통 때와 마찬가지로 전환되지 않음을 0, 완전히 전환됨을 1 로 생각하면 된다.
+		/// 역전환인지 여부. true일 경우 실제 전환 전환 비율을 반대로 적용한다. (0~1 -> 1~0)
+		/// 역전환 시 전환 비율을 설정할 시에는 보통 때와 마찬가지로 전환되지 않음을 0, 완전히 전환됨을 1 로 생각하면 된다.
 		/// </summary>
 		public bool reverseTransition { get; set; }
 
