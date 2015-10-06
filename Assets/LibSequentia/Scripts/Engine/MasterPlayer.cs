@@ -519,7 +519,11 @@ namespace LibSequentia.Engine
 
 				if (m_tranScenario != null)												// TransitionScenario 끝내기
 				{
-					transition		= m_tranScenario.reverseTransition? 0 : 1;
+					bool revTrans	= m_tranScenario.reverseTransition;
+					if (revTrans != m_reverse)											// 특정 방향으로 진행하다가 다시 반대쪽으로 되돌아와서 트랜지션이 끝나는 경우, 트랜지션 비율을 원상복구해야한다.
+						revTrans	= !revTrans;
+
+					transition		= revTrans? 0 : 1;
 					m_tranScenario	= null;
 				}
 

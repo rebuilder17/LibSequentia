@@ -155,6 +155,11 @@ namespace LibSequentia.Engine
 					};
 				handle_stepmove.transitionDelegate	= m_transition_callback;
 				//
+				handle_stepmove.notConsumedDelegate = () =>
+					{
+						Debug.LogWarning("stepmove ignored! m_targetStep : " + m_targetStep);
+						handle_stepmove.SetIgnore();
+					};
 
 				return true;
 			}

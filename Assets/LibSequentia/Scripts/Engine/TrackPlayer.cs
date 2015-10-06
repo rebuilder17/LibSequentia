@@ -343,7 +343,7 @@ namespace LibSequentia.Engine
 		public double CalcSectionTransitionTimeLength(int sectionindex, SectionPlayer.TransitionType ttype)
 		{
 			int trbeats				= 4;
-			if (sectionindex < m_track.sectionCount)				// 다음에 올 섹션이 있다면 해당 섹션의 앞쪽 부분을 기준으로 계산
+			if (sectionindex < m_track.sectionCount && sectionindex >= 0)	// 다음에 올 섹션이 있다면 해당 섹션의 앞쪽 부분을 기준으로 계산
 			{
 				var nextsec			= m_track.GetSection(sectionindex);
 				trbeats				= nextsec.beatStart;
@@ -397,8 +397,8 @@ namespace LibSequentia.Engine
 				sectionIdx	+= 1;
 			}
 
-			// sectionIdx는 0보다 작을 수 없고, 섹션 갯수보다 많을 수 없다. (섹션 갯수와 같음 == 트랙 종료)
-			if (sectionIdx < 0)					sectionIdx = 0;
+			// sectionIdx는 -1보다 작을 수 없고, 섹션 갯수보다 많을 수 없다. (섹션 갯수와 같음 == 트랙 종료, 혹은 -1 == 트랙 종료)
+			if (sectionIdx < -1)					sectionIdx = -1;
 			else if (sectionIdx > sectionCount)	sectionIdx = sectionCount;
 
 			var tinfo		= DoProgress(targetTr, reverse, sectionIdx);
