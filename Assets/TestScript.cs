@@ -214,7 +214,6 @@ public class TestScript : MonoBehaviour
 			var cur		= m_stateSeq[m_stateidx];
 			if (cur.newtrack != null && prev.newtrack == null)
 			{
-				Debug.LogWarning("newtrack!");
 				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, false);
 			}
 			else if (cur.newtrack != null && prev.newtrack != null)
@@ -264,7 +263,6 @@ public class TestScript : MonoBehaviour
 			var cur		= m_stateSeq[m_stateidx];
 			if (cur.newtrack != null && prev.newtrack == null)
 			{
-				Debug.LogWarning("newtrack! (reverse)");
 				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, true);
 			}
 			else if (cur.newtrack != null && prev.newtrack != null)

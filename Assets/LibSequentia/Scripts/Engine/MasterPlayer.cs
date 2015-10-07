@@ -276,7 +276,7 @@ namespace LibSequentia.Engine
 			if (type == Message.Type.ManualProgress || type == Message.Type.NaturalProgress || type == Message.Type.StepTo)
 			{
 				m_transitionMsgHandle	= msg.handle;
-				Debug.Log("transition message in : " + type);
+				Debug.LogWarning("transition message in : " + type);
 			}
 		}
 
@@ -372,6 +372,10 @@ namespace LibSequentia.Engine
 							m_transitionType		= SectionPlayer.TransitionType.Natural;	// NOTE : 현재 이거 무의미해서 그냥 안고치고 이대로 둠....
 							m_transitionReserved	= true;
 							m_reverse				= reverse;
+						}
+						else
+						{
+							Debug.LogWarningFormat("cannot process StepTo - step : {0}, reverse : {1}, CalcStep : {2}", step, reverse, currentPlayer.CalcStep(reverse));
 						}
 					}
 					break;
@@ -541,9 +545,14 @@ namespace LibSequentia.Engine
 				{
 					var msg	= m_msgQueue.Peek();
 
-					if (msg.ignore || ProcessMessage(ref msg))			// 메세지를 정상적으로 처리하면 큐에서 삭제
+					if (msg.ignore)
 					{
-						Debug.Log(msg.type.ToString() + " message " + (msg.ignore? "ignored" : "consumed"));
+						Debug.Log(msg.type.ToString() + " message ignored");
+						m_msgQueue.Dequeue();
+					}
+					else if (ProcessMessage(ref msg))					// 메세지를 정상적으로 처리하면 큐에서 삭제
+					{
+						Debug.Log(msg.type.ToString() + " message consumed");
 						m_msgQueue.Dequeue();
 
 						CheckAndSetTransitionMessageHandle(ref msg);	// 트랜지션 메세지인지 보고 세팅
@@ -590,6 +599,8 @@ namespace LibSequentia.Engine
 						ProcessState_TransitionFinish();
 						break;
 				}
+
+				yield return null;// TEST
 			}
 		}
 	}

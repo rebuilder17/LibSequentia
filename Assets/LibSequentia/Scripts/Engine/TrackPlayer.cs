@@ -114,7 +114,7 @@ namespace LibSequentia.Engine
 		/// 현재 재생중인 트랙의 인덱스 = 버림(진행도 / 2) - 1.
 		/// 즉 아무것도 재생중인 경우가 아닐 시 0, 첫 번째 섹션이 재생중일 때는 2, 그 다음은 4, ...
 		/// </summary>
-		private int CalcStep(bool reverse)
+		public int CalcStep(bool reverse)
 		{
 			var stepcalc	= (m_sectionIdx + 1) * 2;						// 현재의 sectionIdx 기준으로 우선 계산
 			if (m_curTransition == SectionPlayer.TransitionType.Natural)	// 자연 진행이 걸린 경우 홀수값으로 리턴해줘야한다.
@@ -248,7 +248,7 @@ namespace LibSequentia.Engine
 					m_sectionIdx	= sectionIdxOverride;
 				}
 				
-				Debug.Log("switch player. section idx : " + m_sectionIdx);
+				//Debug.Log("switch player. section idx : " + m_sectionIdx);
 			}
 
 
@@ -281,7 +281,7 @@ namespace LibSequentia.Engine
 
 				if ((!reverse && m_sectionIdx < m_track.sectionCount) || (reverse && m_sectionIdx >= 0))	// 더 진행할 섹션이 있는 경우에만
 				{
-					Debug.LogWarning("start : " + ttype);
+					//Debug.LogWarning("start : " + ttype);
 					currentPlayer.StartSection(m_track.GetSection(m_sectionIdx), m_clock, ttype, tinfo.transitionStart);
 					tinfo.transitionEnd		= currentPlayer.firstLoopStartDspTime;
 				}

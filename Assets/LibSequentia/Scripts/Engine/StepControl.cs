@@ -66,6 +66,8 @@ namespace LibSequentia.Engine
 			System.Action	m_transition_callback;
 
 			bool		m_wasNaturalTransition = false;
+			bool		m_moveOnceMoreTriggered	= false;
+			bool		m_moveOnceMoreProcessed	= false;
 
 			public int targetStep { get { return m_targetStep; } }
 			public bool reverse { get { return m_reverse; } }
@@ -116,6 +118,8 @@ namespace LibSequentia.Engine
 				var handle_stepmove	= player.ProgressStepTo(m_targetStep, m_reverse);
 				m_stepmove_consume_callback = () =>		// * MoveOnceMore 에서 같은 콜백을 호출할 수 있도록 보관해둔다.
 					{
+						Debug.LogWarning("m_stepmove_consume_callback called");
+
 						if (m_newTrack != null || !ctrl.m_newTrackIsOn)
 						{
 							// 이 요청이 새 트랙 재생을 요구하거나 (그래서 지금 올라온 새 트랙은 현재 재생중인 것이 아님), 기존에 새 트랙이 없을 시엔 curTrackStep을 건드린다.
@@ -137,6 +141,8 @@ namespace LibSequentia.Engine
 				//
 				m_transition_callback = () =>	// * MoveOnceMore 에서 같은 콜백을 호출할 수 있도록 보관해둔다.
 					{
+						Debug.LogWarning("m_transition_callback called");
+
 						if (m_newTrack == null && ctrl.m_newTrackIsOn)	// 이 요청이 새 트랙 재생을 요구하지 않은 경우, 진행중이던 새 트랙이 만약 있었다면
 						{
 							ctrl.m_newTrackIsOn = false;				// 트랜지션 후 그 트랙으로 넘어갔을 것이기에 플래그를 꺼준다.
@@ -164,6 +170,28 @@ namespace LibSequentia.Engine
 				return true;
 			}
 
+			protected override void OnUpdate()
+			{
+				if (m_moveOnceMoreTriggered && !m_moveOnceMoreProcessed)	// MoveOnceMore의 실제 처리를 이 부분에서 한다.
+				{
+					m_moveOnceMoreProcessed = true;
+
+					//m_targetStep++;
+					var handle	= player.ProgressStepTo(m_targetStep + (m_reverse? -1 : 1), m_reverse);
+					// 이쪽 방향 콜백은 원래의 것을 그대로 사용한다.
+					handle.consumedDelegate		= m_stepmove_consume_callback;
+					handle.transitionDelegate	= m_transition_callback;
+
+					handle.notConsumedDelegate	= () =>
+						{
+							// 처리되지 못하는 경우가 생긴다면 아마도 이전에 시도한 자연 전환이 진행중이기 때문일 것임.
+							// 따로 처리가 필요하지 않은 경우이므로 이 메세지는 무시하게 한다.
+							Debug.LogWarning("MoveOnceMore : stepto ignored");
+							handle.SetIgnore();
+						};
+				}
+			}
+
 			/// <summary>
 			/// 한번 더 움직인다. 같은 방향으로 움직여서 자연 진행 => 강제 진행으로 바뀌는 경우에 해당
 			/// </summary>
@@ -171,22 +199,11 @@ namespace LibSequentia.Engine
 			/// <returns></returns>
 			public bool MoveOnceMore(bool reverse)
 			{
-				// 진행 방향이 다르거나 현재의 타겟 스텝이 홀수(자연진행)이 아닌 경우엔 리턴. (별도의 stepmove 요청으로 처리해야 한다)
-				if (m_reverse != reverse || m_targetStep % 2 != 1)
+				// 진행 방향이 다르거나 현재의 타겟 스텝이 홀수(자연진행)이 아닌 경우, 이미 MoveOnceMore가 호출된 경우엔 리턴. (별도의 stepmove 요청으로 처리해야 한다)
+				if (m_reverse != reverse || m_targetStep % 2 != 1 || m_moveOnceMoreTriggered)
 					return false;
 
-				//m_targetStep++;
-				var handle	= player.ProgressStepTo(m_targetStep + (m_reverse? -1 : 1), m_reverse);
-				// 이쪽 방향 콜백은 원래의 것을 그대로 사용한다.
-				handle.consumedDelegate		= m_stepmove_consume_callback;
-				handle.transitionDelegate	= m_transition_callback;
-
-				handle.notConsumedDelegate	= () =>
-					{
-						// 처리되지 못하는 경우가 생긴다면 아마도 이전에 시도한 자연 전환이 진행중이기 때문일 것임.
-						// 따로 처리가 필요하지 않은 경우이므로 이 메세지는 무시하게 한다.
-						handle.SetIgnore();
-					};
+				m_moveOnceMoreTriggered	= true;		// moveOnceMore 실행 예약 (Update루프에서 처리한다)
 
 				return true;
 			}
@@ -232,6 +249,7 @@ namespace LibSequentia.Engine
 				handle.consumedDelegate	= () =>
 					{
 						ctrl.m_curTrackStep	= nextstep;
+						Debug.Log("m_curTrackStep <- nextstep (NewStartOneTrackRequest) : " + ctrl.m_curTrackStep);
 					};
 				handle.transitionDelegate = () =>
 					{
@@ -295,24 +313,30 @@ namespace LibSequentia.Engine
 				// 커맨드 큐에 들어온 명령어가 있고, 메세지 큐에 쌓인 메세지가 일정 수 이하일 때만 처리
 				if (m_cmdQueue.Count > 0 && m_reqQueue.Count < 2)
 				{
-					var cmd	= m_cmdQueue.Dequeue();
+					var cmd		= m_cmdQueue.Peek();
+					var consume	= false;
 					switch(cmd.type)
 					{
 						case Command.Type.StartWithOneTrack:
 							_StartWithOneTrack((Data.Track)cmd.param1, (int)cmd.param2, (bool)cmd.param3);
+							consume	= true;
 							break;
 
 						case Command.Type.StartWithTwoTrack:
 							_StartWithTwoTrack((Data.Track)cmd.param1, (int)cmd.param2, (Data.Track)cmd.param3, (Data.TransitionScenario)cmd.param4, (bool)cmd.param5);
+							consume	= true;
 							break;
 
 						case Command.Type.StepMove:
-							_StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (bool)cmd.param4);
+							consume	= _StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (bool)cmd.param4);
 							break;
 
 						default:
 							throw new System.InvalidOperationException("unknown command type " + cmd.type);
 					}
+
+					if (consume)				// 명령을 소비한 경우에만 큐에서 날린다.
+						m_cmdQueue.Dequeue();
 				}
 
 				if (m_reqQueue.Count > 0)
@@ -381,29 +405,45 @@ namespace LibSequentia.Engine
 			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StepMove, param1 = step, param2 = newTrack, param3 = transcen, param4 = reverse });
 		}
 
-		void _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="step"></param>
+		/// <param name="newTrack"></param>
+		/// <param name="transcen"></param>
+		/// <param name="reverse"></param>
+		/// <returns>cmd 를 소모해야하는지 여부. true일 경우 큐에서 날린다. false일 경우 날리지 않고 다음 프레임에 계속 체크해본다</returns>
+		bool _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
 		{
-			//if ((m_newTrackIsOn? m_newTrackStep : m_curTrackStep) == step)
 			Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
 			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
 			{
 				Debug.LogWarning("same step");
-				return;
+				return true;
 			}
 
 			// 현재 진행중인 요청이 stepmove고, 한번 더 진행이 가능한 경우에는 따로 요청을 늘리지 않는다. (자연 -> 강제 전환으로 바꾸는 것임)
 			var stepMoveReq	= m_reqQueue.Count > 0 ? m_reqQueue.Peek() as StepMoveRequest : null;
 			if (stepMoveReq != null && stepMoveReq.MoveOnceMore(reverse))
 			{
-				return;
+				return true;
 			}
 
-			var newreq		= new StepMoveRequest(this);
-			//var newstep		= m_newTrackIsOn? m_newTrackStep : m_curTrackStep;
-			//newstep			+= reverse? -1 : 1;
-			newreq.Setup(step, reverse, newTrack, transcen);
+			if (stepMoveReq == null)			// 현재 진행중인 요청이 stepmove가 아닌 경우에만 새 명령을 추가한다.
+			{
+				var newreq		= new StepMoveRequest(this);
+				//var newstep		= m_newTrackIsOn? m_newTrackStep : m_curTrackStep;
+				//newstep			+= reverse? -1 : 1;
+				newreq.Setup(step, reverse, newTrack, transcen);
 
-			m_reqQueue.Enqueue(newreq);
+				m_reqQueue.Enqueue(newreq);
+
+				return true;
+			}
+			else
+			{									// stepmove가 맞긴 맞는데 위 moveoncemore 를 실패한 경우라면, 이 명령은 소모해서는 안됨
+				return false;
+			}
 		}
 	}
 }

@@ -286,7 +286,7 @@ namespace LibSequentia.Engine
 				timeLoopStart	-= offset;
 				timeNextLoopEnd	-= offset;
 			}
-			Debug.Log("PlayScheduled time : " + timePlay + ", offset : " + offset);
+			//Debug.Log("PlayScheduled time : " + timePlay + ", offset : " + offset);
 			curplayer.PlayScheduled(timePlay, offset);			// 다음번 비트에 음원 재생
 
 
@@ -393,7 +393,7 @@ namespace LibSequentia.Engine
 					{
 						currentPlayerComponent.PlayScheduled(nextLoopEndDspTime, loopStartOffset);
 
-						Debug.Log("Loop reserved");
+						//Debug.Log("Loop reserved");
 						m_loopReserved		= true;									// 루프 예약 지정
 					}
 				}
