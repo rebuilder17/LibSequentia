@@ -85,6 +85,8 @@ namespace LibSequentia.Data
 		public static Track CreateFromJSON(JSONObject json, IAudioClipPack clipPack)
 		{
 			var track	= new Track();
+			track.SetClipPack(clipPack);
+
 			track.BPM	= json.GetField("bpm").f;
 
 			json.GetField("sections", (sectionarr) =>

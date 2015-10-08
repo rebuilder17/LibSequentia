@@ -43,10 +43,12 @@ public class TestScript : MonoBehaviour
 	
 	void Awake()
 	{
+		Application.targetFrameRate	= -1;
+
 		// TEST : 버퍼 사이즈를 조절해본다.
 		var audioSettings			= AudioSettings.GetConfiguration();
 		Debug.Log("original buffer size is : " + audioSettings.dspBufferSize);
-		audioSettings.dspBufferSize	= 2048;
+		//audioSettings.dspBufferSize	= 2048;
 		AudioSettings.Reset(audioSettings);
 		//
 
@@ -195,18 +197,31 @@ public class TestScript : MonoBehaviour
 
 	List<StepState>	m_stateSeq	= new List<StepState>();
 	//StepState		m_curstate	= new StepState();
-	int				m_stateidx	= 0;
+	int				m_stateidx	= -1;
 	StepControl		m_ctrl;
+	bool			m_firstrun	= true;
+
+	bool			m_newTrackReverse;
 
 	void NextStep()
 	{
+		Debug.Log("NextStep");
+
+		if (m_firstrun)
+			m_firstrun	= false;
+
+		if (m_stateidx < m_stateSeq.Count)
+		{
+			m_stateidx++;
+		}
+
 		if (m_stateidx == 0)
 		{
 			m_ctrl.StartWithOneTrack(m_stateSeq[0].curtrack, 1, false);
 		}
 		else if (m_stateidx >= m_stateSeq.Count)
 		{
-			m_ctrl.StepMove(m_stateSeq[m_stateSeq.Count - 1].step + 1, false);
+			m_ctrl.StepMove(m_stateSeq[m_stateSeq.Count - 1].step + 1, -1, false);
 		}
 		else
 		{
@@ -214,39 +229,51 @@ public class TestScript : MonoBehaviour
 			var cur		= m_stateSeq[m_stateidx];
 			if (cur.newtrack != null && prev.newtrack == null)
 			{
-				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, false);
+				m_newTrackReverse	= false;
+				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, false);
 			}
 			else if (cur.newtrack != null && prev.newtrack != null)
 			{
-				if (cur.newstep >= 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				//if (cur.newstep >= 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				//{
+				//	m_ctrl.StepMove(cur.newstep, false);
+				//}
+				//else
+				//{
+				//	m_ctrl.StepMove(cur.step, false);
+				//}
+				if (m_newTrackReverse)
 				{
-					m_ctrl.StepMove(cur.newstep, false);
+					m_ctrl.StepMove(cur.newstep, cur.newtrack, cur.tscen, cur.step, false);
 				}
 				else
 				{
-					m_ctrl.StepMove(cur.step, false);
+					m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, false);
 				}
 			}
 	
 			else
 			{
-				m_ctrl.StepMove(cur.step, false);
+				m_ctrl.StepMove(cur.step, cur.newstep, false);
 			}
-		}
-
-		if (m_stateidx < m_stateSeq.Count)
-		{
-			m_stateidx++;
 		}
 	}
 
 	void PrevStep()
 	{
-		if (m_stateidx > 0)
+		Debug.Log("PrevStep");
+
+		if (m_firstrun)
+		{
+			m_stateidx	= m_stateSeq.Count;
+			m_firstrun	= false;
+		}
+
+		if (m_stateidx > -1)
 		{
 			m_stateidx--;
+			Debug.Log("m_stateidx : " + m_stateidx);
 		}
-		
 
 		if (m_stateidx >= m_stateSeq.Count - 1)
 		{
@@ -255,7 +282,7 @@ public class TestScript : MonoBehaviour
 		}
 		else if (m_stateidx < 0)
 		{
-			m_ctrl.StepMove(0, true);
+			m_ctrl.StepMove(0, -1, true);
 		}
 		else
 		{
@@ -263,23 +290,33 @@ public class TestScript : MonoBehaviour
 			var cur		= m_stateSeq[m_stateidx];
 			if (cur.newtrack != null && prev.newtrack == null)
 			{
-				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, true);
+				m_newTrackReverse	= true;
+				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, cur.step, true);
 			}
 			else if (cur.newtrack != null && prev.newtrack != null)
 			{
-				if (cur.step <= cur.curtrack.sectionCount * 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				//if (cur.step <= cur.curtrack.sectionCount * 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
+				//{
+				//	m_ctrl.StepMove(cur.step, true);
+				//}
+				//else
+				//{
+				//	m_ctrl.StepMove(cur.newstep, true);
+				//}
+				if (m_newTrackReverse)
 				{
-					m_ctrl.StepMove(cur.step, true);
+					m_ctrl.StepMove(cur.newstep, cur.newtrack, cur.tscen, cur.step, true);
 				}
 				else
 				{
-					m_ctrl.StepMove(cur.newstep, true);
+					m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, true);
 				}
+				
 			}
 	
 			else
 			{
-				m_ctrl.StepMove(cur.step, true);
+				m_ctrl.StepMove(cur.step, -1, true);
 			}
 		}
 	}
@@ -316,9 +353,6 @@ public class TestScript : MonoBehaviour
 
 		if (Input.GetKeyDown(KeyCode.Semicolon))
 		{
-			if (m_stateidx == 0)
-				m_stateidx = m_stateSeq.Count;
-
 			PrevStep();
 		}
 

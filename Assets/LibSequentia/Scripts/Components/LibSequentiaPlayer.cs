@@ -50,6 +50,14 @@ public class LibSequentiaPlayer : MonoBehaviour, IPlayerComponent
 		}
 	}
 
+	/// <summary>
+	/// 오디오 소스 배열
+	/// </summary>
+	public AudioSource[] audioSources
+	{
+		get { return m_audioSources; }
+	}
+
 
 
 

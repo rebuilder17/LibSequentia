@@ -108,7 +108,36 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 				var calcvalue				= info.ToMixerParamValue(value);
 				_temp_snapshot_weight[0]	= 1 - calcvalue;
 				_temp_snapshot_weight[1]	= calcvalue;
-				m_mixer.TransitionToSnapshots(snapshots, _temp_snapshot_weight, 0.0f);
+				m_mixer.TransitionToSnapshots(snapshots, _temp_snapshot_weight, 0.1f);
+			}
+		}
+	}
+
+	
+	/// <summary>
+	/// 오디오 소스를 대상으로 한 오토메이션 컨트롤
+	/// </summary>
+	class AudioSourceAutomationControl : IAutomationControl
+	{
+		// Members
+
+		AudioSource m_source;
+
+		public AudioSourceAutomationControl(AudioSource source)
+		{
+			m_source	= source;
+		}
+
+		/// <summary>
+		/// 볼륨만 컨트롤한다.
+		/// </summary>
+		/// <param name="param"></param>
+		/// <param name="value"></param>
+		public void Set(Automation.TargetParam param, float value)
+		{
+			if(param == Automation.TargetParam.Volume)
+			{
+				m_source.volume	= value;
 			}
 		}
 	}
@@ -118,7 +147,7 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 
 	// Members
 
-	Dictionary<string, AudioMixerAutomationControl>	m_mixerControls	= new Dictionary<string, AudioMixerAutomationControl>();
+	Dictionary<string, IAutomationControl>	m_mixerControls	= new Dictionary<string, IAutomationControl>();
 
 	List<IAutomationHubHandle>	m_handles	= new List<IAutomationHubHandle>();	// 업데이트해줘야할 automation hub 핸들
 
@@ -145,6 +174,12 @@ public class LibSequentiaAutomationManager : MonoBehaviour, IAutomationHubManage
 		{
 			mixerctrl.AddParamToIgnore(Automation.TargetParam.LowCut);
 		}
+	}
+
+	public void AddAutomationControlToSource(string ctrlname, AudioSource source)
+	{
+		var sourcectrl				= new AudioSourceAutomationControl(source);
+		m_mixerControls[ctrlname]	= sourcectrl;
 	}
 
 	public IAutomationControl GetAutomationControlToSingleMixer(string ctrlname)

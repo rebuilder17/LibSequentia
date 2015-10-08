@@ -287,7 +287,7 @@ namespace LibSequentia.Engine
 		{
 			if (m_transitionMsgHandle != null)
 			{
-				Debug.Log("calling transition message handle callback");
+				//Debug.Log("calling transition message handle callback");
 				m_transitionMsgHandle.CallTransition();
 				m_transitionMsgHandle	= null;
 			}
@@ -333,6 +333,10 @@ namespace LibSequentia.Engine
 						sidePlayer.SetTrack(msg.parameter as Data.Track, currentPlayer.clock);
 						m_newTrackReady	= true;
 						consume			= true;
+
+						// 해당 deck의 오토메이션 컨트롤 초기화
+						m_trackTransCtrls[(m_playerIdx + 1) % 2].Set(Data.Automation.TargetParam.Volume, 1);
+						m_trackTransCtrls[(m_playerIdx + 1) % 2].Set(Data.Automation.TargetParam.LowCut, 0);
 					}
 					else
 					{

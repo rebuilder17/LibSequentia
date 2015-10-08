@@ -75,16 +75,20 @@ namespace LibSequentia.Engine
 			public StepMoveRequest(StepControl player) : base(player) { }
 
 
-			public void Setup(int targetStep, bool reverse, Data.Track newtrack = null, Data.TransitionScenario trans = null)
+			public void Setup(int targetStep, int newStep, bool reverse, Data.Track newtrack = null, Data.TransitionScenario trans = null)
 			{
-				m_targetStep	= targetStep;
+				// 새 트랙이 진행중이면서 진행방향이 일치하는 경우 newStep을 사용한다. (새 트랙에 타겟팅중이므로)
+				bool usingNewStep	= ctrl.m_newTrackIsOn && reverse == ctrl.m_newTrackWasReversed;
+				Debug.Log(usingNewStep? "using newStep" : "using targetStep");
+
+				m_targetStep	= usingNewStep? newStep : targetStep;
 				m_reverse		= reverse;
-				m_newTrack		= newtrack;
+				m_newTrack		= ctrl.m_newTrackIsOn? null : newtrack;	// 새 트랙이 올라와있다면 newtrack은 무시한다.
 				m_trans			= trans;
 
 				m_wasNaturalTransition	= (targetStep % 2 == 1);
 
-				Debug.Log(string.Format("[stepmove setup] targetStep : {0} reverse : {1} ... ctrl.m_newTrackIsOn : {2}", targetStep, reverse, ctrl.m_newTrackIsOn));
+				//Debug.Log(string.Format("[stepmove setup] targetStep : {0} reverse : {1} ... ctrl.m_newTrackIsOn : {2}", targetStep, reverse, ctrl.m_newTrackIsOn));
 			}
 
 			protected override bool OnStart()
@@ -96,6 +100,7 @@ namespace LibSequentia.Engine
 						{
 							ctrl.m_newTrackIsOn	= true;
 							ctrl.m_newTrackStep	= m_reverse? m_newTrack.sectionCount * 2 : 2;
+							ctrl.m_newTrackWasReversed	= m_reverse;
 							Debug.Log("m_newTrackIsOn : true, m_newTrackStep : " + ctrl.m_newTrackStep);
 						};
 				}
@@ -118,7 +123,7 @@ namespace LibSequentia.Engine
 				var handle_stepmove	= player.ProgressStepTo(m_targetStep, m_reverse);
 				m_stepmove_consume_callback = () =>		// * MoveOnceMore 에서 같은 콜백을 호출할 수 있도록 보관해둔다.
 					{
-						Debug.LogWarning("m_stepmove_consume_callback called");
+						//Debug.LogWarning("m_stepmove_consume_callback called");
 
 						if (m_newTrack != null || !ctrl.m_newTrackIsOn)
 						{
@@ -141,7 +146,7 @@ namespace LibSequentia.Engine
 				//
 				m_transition_callback = () =>	// * MoveOnceMore 에서 같은 콜백을 호출할 수 있도록 보관해둔다.
 					{
-						Debug.LogWarning("m_transition_callback called");
+						//Debug.LogWarning("m_transition_callback called");
 
 						if (m_newTrack == null && ctrl.m_newTrackIsOn)	// 이 요청이 새 트랙 재생을 요구하지 않은 경우, 진행중이던 새 트랙이 만약 있었다면
 						{
@@ -248,7 +253,9 @@ namespace LibSequentia.Engine
 				var handle		= player.ProgressStepTo(startstep, m_reverse);
 				handle.consumedDelegate	= () =>
 					{
-						ctrl.m_curTrackStep	= nextstep;
+						ctrl.m_curTrackStep			= nextstep;
+						ctrl.m_lastMoveWasReversed	= m_reverse;
+						ctrl.m_newTrackWasReversed	= m_reverse;
 						Debug.Log("m_curTrackStep <- nextstep (NewStartOneTrackRequest) : " + ctrl.m_curTrackStep);
 					};
 				handle.transitionDelegate = () =>
@@ -294,6 +301,7 @@ namespace LibSequentia.Engine
 		int					m_newTrackStep;			// 새 트랙의 step
 		bool				m_newTrackIsOn;			// 새 트랙이 현재 트랜지션중인지
 		bool				m_lastMoveWasReversed;	// 가장 최근의 이동이 역방향 진행이었는지
+		bool				m_newTrackWasReversed;	// 새 트랙에 진입할 시의 reverse 상황
 
 
 		public StepControl(MasterPlayer player, MonoBehaviour context)
@@ -328,7 +336,7 @@ namespace LibSequentia.Engine
 							break;
 
 						case Command.Type.StepMove:
-							consume	= _StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (bool)cmd.param4);
+							consume	= _StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (int)cmd.param4, (bool)cmd.param5);
 							break;
 
 						default:
@@ -348,7 +356,7 @@ namespace LibSequentia.Engine
 					if (req.isComplete)					// 완료된 요청은 제거한다.
 					{
 						m_reqQueue.Dequeue();
-						Debug.Log("dequeue");
+						//Debug.Log("dequeue");
 					}
 				}
 			}
@@ -389,9 +397,9 @@ namespace LibSequentia.Engine
 		/// 트랜지션 단계 진행
 		/// </summary>
 		/// <param name="reverse"></param>
-		public void StepMove(int step, bool reverse = false)
+		public void StepMove(int step, int newstep = -1, bool reverse = false)
 		{
-			StepMove(step, null, null, reverse);
+			StepMove(step, null, null, newstep, reverse);
 		}
 
 		/// <summary>
@@ -400,9 +408,9 @@ namespace LibSequentia.Engine
 		/// <param name="newTrack"></param>
 		/// <param name="transcen"></param>
 		/// <param name="reverse"></param>
-		public void StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
+		public void StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, int newstep = -1, bool reverse = false)
 		{
-			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StepMove, param1 = step, param2 = newTrack, param3 = transcen, param4 = reverse });
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StepMove, param1 = step, param2 = newTrack, param3 = transcen, param4 = newstep, param5 = reverse });
 		}
 
 		/// <summary>
@@ -413,7 +421,7 @@ namespace LibSequentia.Engine
 		/// <param name="transcen"></param>
 		/// <param name="reverse"></param>
 		/// <returns>cmd 를 소모해야하는지 여부. true일 경우 큐에서 날린다. false일 경우 날리지 않고 다음 프레임에 계속 체크해본다</returns>
-		bool _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, bool reverse = false)
+		bool _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, int newstep = -1, bool reverse = false)
 		{
 			Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
 			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
@@ -434,7 +442,7 @@ namespace LibSequentia.Engine
 				var newreq		= new StepMoveRequest(this);
 				//var newstep		= m_newTrackIsOn? m_newTrackStep : m_curTrackStep;
 				//newstep			+= reverse? -1 : 1;
-				newreq.Setup(step, reverse, newTrack, transcen);
+				newreq.Setup(step, newstep, reverse, newTrack, transcen);
 
 				m_reqQueue.Enqueue(newreq);
 
