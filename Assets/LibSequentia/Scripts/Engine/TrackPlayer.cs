@@ -268,12 +268,12 @@ namespace LibSequentia.Engine
 			if (!sidePlayer.isOnTransition
 				&& (int)ttype > (int)sidePlayer.currentEndTransition)
 			{
-				Debug.LogWarningFormat("transition check - m_sectionIdx : {0}, m_suppressProgress : {1}", m_sectionIdx, m_suppressProgress);
+				//Debug.LogWarningFormat("transition check - m_sectionIdx : {0}, m_suppressProgress : {1}", m_sectionIdx, m_suppressProgress);
 				if(((!reverse && m_sectionIdx > 0) || (reverse && m_sectionIdx < m_track.sectionCount - 1))
 					&& !m_suppressProgress && !sidePlayer.isReadyOrFinished)	// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
 				{
 					tinfo.transitionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
-					Debug.LogWarning("fadeout triggered");
+					//Debug.LogWarning("fadeout triggered");
 				}
 				else
 				{											// 그 외의 경우엔 전부 다음 비트에 트랜지션 시작하는 것으로

@@ -101,7 +101,7 @@ namespace LibSequentia.Engine
 							ctrl.m_newTrackIsOn	= true;
 							ctrl.m_newTrackStep	= m_reverse? m_newTrack.sectionCount * 2 : 2;
 							ctrl.m_newTrackWasReversed	= m_reverse;
-							Debug.Log("m_newTrackIsOn : true, m_newTrackStep : " + ctrl.m_newTrackStep);
+							//Debug.Log("m_newTrackIsOn : true, m_newTrackStep : " + ctrl.m_newTrackStep);
 						};
 				}
 
@@ -130,11 +130,8 @@ namespace LibSequentia.Engine
 							// 이 요청이 새 트랙 재생을 요구하거나 (그래서 지금 올라온 새 트랙은 현재 재생중인 것이 아님), 기존에 새 트랙이 없을 시엔 curTrackStep을 건드린다.
 							// 트랙 트랜지션 상태에서 다시 반대방향으로 빠져나가는 경우엔 앞선 요청에서 (cancelTrack) m_newTrackIsOn 을 false로 두었으므로 별도 조건은 없어도 된다.
 							ctrl.m_curTrackStep		= m_targetStep;
-							//if (m_targetStep % 2 == 1)	// 자연 진행일 경우, m_curTrackStep은 강제 진행시의 step 인덱스로 세팅해줘야한다.
-							//{
-							//	ctrl.m_curTrackStep += m_reverse? -1 : 1;
-							//}
-							Debug.Log("m_curTrackStep <- m_targetStep : " + ctrl.m_curTrackStep);
+
+							//Debug.Log("m_curTrackStep <- m_targetStep : " + ctrl.m_curTrackStep);
 						}
 						else
 						{
@@ -152,13 +149,13 @@ namespace LibSequentia.Engine
 						{
 							ctrl.m_newTrackIsOn = false;				// 트랜지션 후 그 트랙으로 넘어갔을 것이기에 플래그를 꺼준다.
 							ctrl.m_curTrackStep	= ctrl.m_newTrackStep;	// 스텝도 이제부터는 기존에 새로 올라갔던 트랙의 스텝을 따라가야함
-							Debug.Log("m_curTrackStep <- m_newTrackStep : " + ctrl.m_newTrackStep);
+							//Debug.Log("m_curTrackStep <- m_newTrackStep : " + ctrl.m_newTrackStep);
 						}
 
 						if (m_wasNaturalTransition)						// 자연 트랜지션이었을 경우, 현재 스텝을 더해준다
 						{
 							ctrl.m_curTrackStep += m_reverse? -1 : 1;
-							Debug.Log("(because of m_wasNaturalTransition) ctrl.m_curTrackStep++ : " + ctrl.m_curTrackStep);
+							//Debug.Log("(because of m_wasNaturalTransition) ctrl.m_curTrackStep++ : " + ctrl.m_curTrackStep);
 						}
 
 						ctrl.m_lastMoveWasReversed	= m_reverse;		// 진행 방향도 저장
@@ -169,7 +166,7 @@ namespace LibSequentia.Engine
 				handle_stepmove.notConsumedDelegate = () =>
 					{
 						Debug.LogWarning("stepmove ignored! m_targetStep : " + m_targetStep);
-						handle_stepmove.SetIgnore();
+						//handle_stepmove.SetIgnore();
 					};
 
 				return true;
@@ -256,11 +253,11 @@ namespace LibSequentia.Engine
 						ctrl.m_curTrackStep			= nextstep;
 						ctrl.m_lastMoveWasReversed	= m_reverse;
 						ctrl.m_newTrackWasReversed	= m_reverse;
-						Debug.Log("m_curTrackStep <- nextstep (NewStartOneTrackRequest) : " + ctrl.m_curTrackStep);
+						//Debug.Log("m_curTrackStep <- nextstep (NewStartOneTrackRequest) : " + ctrl.m_curTrackStep);
 					};
 				handle.transitionDelegate = () =>
 					{
-						Debug.Log("transition over - next step : " + nextstep);
+						//Debug.Log("transition over - next step : " + nextstep);
 						isComplete	= true;
 					};
 
@@ -513,7 +510,7 @@ namespace LibSequentia.Engine
 			//Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
 			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
 			{
-				Debug.LogWarning("same step");
+				Debug.Log("[LibSequentia] same step");
 				return true;
 			}
 

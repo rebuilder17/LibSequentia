@@ -495,7 +495,7 @@ namespace LibSequentia.Engine
 			}
 			else if (!currentPlayer.isPlaying && !sidePlayer.isPlaying)						// 트랜지션중이 아닌데 플레이중도 아니라면, notplaying 스테이트로
 			{
-				Debug.Log(string.Format("current player playing : {0}, side player playing : {1}", currentPlayer.isPlaying, sidePlayer.isPlaying));
+				//Debug.Log(string.Format("current player playing : {0}, side player playing : {1}", currentPlayer.isPlaying, sidePlayer.isPlaying));
 				m_state	= State.NotPlaying;
 			}
 		}
@@ -571,12 +571,12 @@ namespace LibSequentia.Engine
 
 					if (msg.ignore)
 					{
-						Debug.Log(msg.type.ToString() + " message ignored");
+						//Debug.Log(msg.type.ToString() + " message ignored");
 						m_msgQueue.Dequeue();
 					}
 					else if (ProcessMessage(ref msg))					// 메세지를 정상적으로 처리하면 큐에서 삭제
 					{
-						Debug.Log(msg.type.ToString() + " message consumed");
+						//Debug.Log(msg.type.ToString() + " message consumed");
 						m_msgQueue.Dequeue();
 
 						CheckAndSetTransitionMessageHandle(ref msg);	// 트랜지션 메세지인지 보고 세팅
@@ -596,7 +596,7 @@ namespace LibSequentia.Engine
 
 				if (__oldstate != m_state)
 				{
-					Debug.LogWarning("state changed : " + m_state);
+					//Debug.LogWarning("state changed : " + m_state);
 					__oldstate = m_state;
 				}
 
