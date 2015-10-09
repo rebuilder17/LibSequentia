@@ -163,7 +163,7 @@ public class TestScript : MonoBehaviour
 		m_masterplayer.SetTransitionCtrls(deckActrl, deckBctrl);
 		
 		//m_masterplayer.SetNewTrack(m_tracks[m_trackIdx], null);
-		m_masterplayer.tension	= 0;
+		m_masterplayer.tension	= 1;
 	}
 
 	SectionPlayer CreateSectionPlayer(UnityEngine.Audio.AudioMixer [] layermixers, IAutomationControl sectionMixerCtrl)
@@ -196,7 +196,7 @@ public class TestScript : MonoBehaviour
 	}
 
 	List<StepState>	m_stateSeq	= new List<StepState>();
-	//StepState		m_curstate	= new StepState();
+	StepState		m_prevState	= new StepState();
 	int				m_stateidx	= -1;
 	StepControl		m_ctrl;
 	bool			m_firstrun	= true;
@@ -205,7 +205,7 @@ public class TestScript : MonoBehaviour
 
 	void NextStep()
 	{
-		Debug.Log("NextStep");
+		Debug.LogWarning("NextStep");
 
 		if (m_firstrun)
 			m_firstrun	= false;
@@ -217,7 +217,10 @@ public class TestScript : MonoBehaviour
 
 		if (m_stateidx == 0)
 		{
-			m_ctrl.StartWithOneTrack(m_stateSeq[0].curtrack, 1, false);
+			var first	= m_stateSeq[0];
+			m_ctrl.StartWithOneTrack(first.curtrack, 1, false);
+
+			m_prevState	= first;
 		}
 		else if (m_stateidx >= m_stateSeq.Count)
 		{
@@ -225,23 +228,22 @@ public class TestScript : MonoBehaviour
 		}
 		else
 		{
-			var prev	= m_stateSeq[m_stateidx - 1];
+			//var prev	= m_stateSeq[m_stateidx - 1];
 			var cur		= m_stateSeq[m_stateidx];
-			if (cur.newtrack != null && prev.newtrack == null)
+			if (cur.newtrack != null && m_prevState.newtrack == null)
 			{
 				m_newTrackReverse	= false;
 				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, false);
 			}
-			else if (cur.newtrack != null && prev.newtrack != null)
+			else if (m_newTrackReverse && m_prevState.newstep == 1)
 			{
-				//if (cur.newstep >= 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
-				//{
-				//	m_ctrl.StepMove(cur.newstep, false);
-				//}
-				//else
-				//{
-				//	m_ctrl.StepMove(cur.step, false);
-				//}
+				// 특수 케이스 처리 : 이전에 역방향으로 다음 트랙으로 넘어가는 자연 진행을 건 경우.
+				// 새 트랙을 다시 올려줘야한다.
+				m_newTrackReverse	= false;
+				m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, false);
+			}
+			else if (cur.newtrack != null && m_prevState.newtrack != null)
+			{
 				if (m_newTrackReverse)
 				{
 					m_ctrl.StepMove(cur.newstep, cur.newtrack, cur.tscen, cur.step, false);
@@ -256,12 +258,14 @@ public class TestScript : MonoBehaviour
 			{
 				m_ctrl.StepMove(cur.step, cur.newstep, false);
 			}
+
+			m_prevState	= cur;
 		}
 	}
 
 	void PrevStep()
 	{
-		Debug.Log("PrevStep");
+		Debug.LogWarning("PrevStep");
 
 		if (m_firstrun)
 		{
@@ -272,13 +276,14 @@ public class TestScript : MonoBehaviour
 		if (m_stateidx > -1)
 		{
 			m_stateidx--;
-			Debug.Log("m_stateidx : " + m_stateidx);
 		}
 
 		if (m_stateidx >= m_stateSeq.Count - 1)
 		{
 			var last	= m_stateSeq[m_stateSeq.Count - 1];
 			m_ctrl.StartWithOneTrack(last.curtrack, last.step, true);
+
+			m_prevState	= last;
 		}
 		else if (m_stateidx < 0)
 		{
@@ -286,23 +291,22 @@ public class TestScript : MonoBehaviour
 		}
 		else
 		{
-			var prev	= m_stateSeq[m_stateidx + 1];
+			//var prev	= m_stateSeq[m_stateidx + 1];
 			var cur		= m_stateSeq[m_stateidx];
-			if (cur.newtrack != null && prev.newtrack == null)
+			if (cur.newtrack != null && m_prevState.newtrack == null)
 			{
 				m_newTrackReverse	= true;
 				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, cur.step, true);
 			}
-			else if (cur.newtrack != null && prev.newtrack != null)
+			else if (!m_newTrackReverse && m_prevState.newstep == 3)
 			{
-				//if (cur.step <= cur.curtrack.sectionCount * 2)	// curstep / newstep 부분의 전환 판단 (새 트랙은 새 step으로 진행시켜줘야함)
-				//{
-				//	m_ctrl.StepMove(cur.step, true);
-				//}
-				//else
-				//{
-				//	m_ctrl.StepMove(cur.newstep, true);
-				//}
+				// 특수 케이스 처리 : 이전에 역방향으로 다음 트랙으로 넘어가는 자연 진행을 건 경우.
+				// 새 트랙을 다시 올려줘야한다.
+				m_newTrackReverse	= true;
+				m_ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, cur.step, true);
+			}
+			else if (cur.newtrack != null && m_prevState.newtrack != null)
+			{
 				if (m_newTrackReverse)
 				{
 					m_ctrl.StepMove(cur.newstep, cur.newtrack, cur.tscen, cur.step, true);
@@ -311,13 +315,14 @@ public class TestScript : MonoBehaviour
 				{
 					m_ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, true);
 				}
-				
 			}
 	
 			else
 			{
 				m_ctrl.StepMove(cur.step, -1, true);
 			}
+
+			m_prevState	= cur;
 		}
 	}
 
@@ -335,7 +340,7 @@ public class TestScript : MonoBehaviour
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 5, newtrack = track2, newstep = 1, tscen = m_tscen });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 6, newtrack = track2, newstep = 2, tscen = m_tscen });
 		m_stateSeq.Add(new StepState() { curtrack = track1, step = 7, newtrack = track2, newstep = 3, tscen = m_tscen });
-		m_stateSeq.Add(new StepState() { curtrack = track1, step = 4 });
+		m_stateSeq.Add(new StepState() { curtrack = track2, step = 4 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 5 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 6 });
 		m_stateSeq.Add(new StepState() { curtrack = track2, step = 7 });
@@ -401,7 +406,41 @@ public class TestScript : MonoBehaviour
 		{
 			m_masterplayer.transition	= Mathf.Min(1, m_masterplayer.transition + 0.1f);
 		}
-		 
+
+		if (m_firstrun)
+		{
+			int idx	= -1;
+
+			if (Input.GetKeyDown(KeyCode.Alpha1))
+				idx	= 0;
+			if (Input.GetKeyDown(KeyCode.Alpha2))
+				idx = 1;
+			if (Input.GetKeyDown(KeyCode.Alpha3))
+				idx = 2;
+			if (Input.GetKeyDown(KeyCode.Alpha4))
+				idx = 3;
+			if (Input.GetKeyDown(KeyCode.Alpha5))
+				idx = 4;
+			if (Input.GetKeyDown(KeyCode.Alpha6))
+				idx = 5;
+			if (Input.GetKeyDown(KeyCode.Alpha7))
+				idx = 6;
+			if (Input.GetKeyDown(KeyCode.Alpha8))
+				idx = 7;
+			if (Input.GetKeyDown(KeyCode.Alpha9))
+				idx = 8;
+			if (Input.GetKeyDown(KeyCode.Alpha0))
+				idx = 9;
+
+			if (idx != -1)
+			{
+				m_stateidx	= idx;
+				var state	= m_stateSeq[idx];
+				m_ctrl.StartWithTwoTrack(state.curtrack, state.step, state.newtrack, state.newstep, state.tscen);
+				m_prevState	= state;
+				m_firstrun	= false;
+			}
+		}
 	}
 
 	void OnGUI()

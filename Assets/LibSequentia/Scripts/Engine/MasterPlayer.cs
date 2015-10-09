@@ -137,7 +137,7 @@ namespace LibSequentia.Engine
 		bool					m_cancelOngoingTrackTransition;			// 현재 트랙 트랜지션 진행중인 경우, 다음 섹션 전환시에 트랙 전환을 하지 않는다.
 		bool					m_bothTrackReady;						// 리셋 후 최초 재생 시작시. 양쪽 트랙이 다 준비되었는지 여부
 		bool					m_transitionReserved;					// 전환 효과 예약되었는지 여부
-		SectionPlayer.TransitionType m_transitionType;					// 전환 타입
+		//SectionPlayer.TransitionType m_transitionType;					// 전환 타입
 		State					m_state;								// 현재 플레이어 상태
 		bool					m_reverse;								// 역진행 여부
 
@@ -276,7 +276,7 @@ namespace LibSequentia.Engine
 			if (type == Message.Type.ManualProgress || type == Message.Type.NaturalProgress || type == Message.Type.StepTo)
 			{
 				m_transitionMsgHandle	= msg.handle;
-				Debug.LogWarning("transition message in : " + type);
+				//Debug.LogWarning("transition message in : " + type);
 			}
 		}
 
@@ -300,13 +300,19 @@ namespace LibSequentia.Engine
 			{
 				case Message.Type.ManualProgress:
 					{
+						if (m_state == State.TransitionReady || m_state == State.TransitionFinish) // 전환중인 경우엔 플래그가 꼬이지 않게 진행하지 않음 (m_transitionReserved)
+						{
+							consume	= false;
+							break;
+						}
+
 						var trtime	= currentPlayer.DoManualProgress();
 						consume		= (trtime.transitionStart >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
 						{
 							lastCalculatedTransitionTime = trtime.transitionEnd;
-							m_transitionType		= SectionPlayer.TransitionType.Manual;
+							//m_transitionType		= SectionPlayer.TransitionType.Manual;
 							m_transitionReserved	= true;
 						}
 					}
@@ -314,13 +320,19 @@ namespace LibSequentia.Engine
 
 				case Message.Type.NaturalProgress:
 					{
+						if (m_state == State.TransitionReady || m_state == State.TransitionFinish) // 전환중인 경우엔 플래그가 꼬이지 않게 진행하지 않음 (m_transitionReserved)
+						{
+							consume	= false;
+							break;
+						}
+
 						var trtime	= currentPlayer.DoNaturalProgress();
 						consume		= (trtime.transitionStart >= 0);
 
 						if (consume)	// 정상적으로 처리된 경우에만 trtime을 트랜지션 시간으로 인정하여 보관한다.
 						{
 							lastCalculatedTransitionTime = trtime.transitionEnd;
-							m_transitionType		= SectionPlayer.TransitionType.Natural;
+							//m_transitionType		= SectionPlayer.TransitionType.Natural;
 							m_transitionReserved	= true;
 						}
 					}
@@ -365,6 +377,12 @@ namespace LibSequentia.Engine
 
 				case Message.Type.StepTo:
 					{
+						if (m_state == State.TransitionReady || m_state == State.TransitionFinish) // 전환중인 경우엔 플래그가 꼬이지 않게 진행하지 않음 (m_transitionReserved)
+						{
+							consume	= false;
+							break;
+						}
+
 						var step	= (int)msg.parameter;
 						var reverse	= (bool)msg.parameter2;
 						var trtime	= currentPlayer.StepTo(step, reverse);
@@ -373,7 +391,7 @@ namespace LibSequentia.Engine
 						if (consume)
 						{
 							lastCalculatedTransitionTime = trtime.transitionEnd;
-							m_transitionType		= SectionPlayer.TransitionType.Natural;	// NOTE : 현재 이거 무의미해서 그냥 안고치고 이대로 둠....
+							//m_transitionType		= SectionPlayer.TransitionType.Natural;	// NOTE : 현재 이거 무의미해서 그냥 안고치고 이대로 둠....
 							m_transitionReserved	= true;
 							m_reverse				= reverse;
 						}
@@ -442,12 +460,13 @@ namespace LibSequentia.Engine
 			{
 				if (m_newTrackReady)					// 새 트랙이 대기중이라면
 				{
+					//Debug.Log("m_transitionReserved / m_newTrackReady true");
 					var newclock	= sidePlayer.clock;
 					var nextbeat	= newclock.CalcNextSafeBeatTime();
 					if (lastCalculatedTransitionTime - nextbeat < newclock.SecondPerBeat)	// 다음 비트에 트랜지션이 온다면 새 트랙 재생 시작
 					{
 						SwitchPlayer();
-						Debug.LogWarning("m_reverse : " + m_reverse);
+						//Debug.LogWarning("m_reverse : " + m_reverse);
 						currentPlayer.DoInstantProgress(m_reverse);							// fill-in 부분을 생략하고 즉시 재생을 한다.
 
 						m_state					= State.TransitionReady;					// 스테이트 변화
@@ -535,6 +554,7 @@ namespace LibSequentia.Engine
 					m_tranScenario	= null;
 				}
 
+				//Debug.Log("sideplayer stop");
 				sidePlayer.StopImmediately();											// 한쪽 플레이어 급히 정지
 			}
 		}
@@ -576,7 +596,7 @@ namespace LibSequentia.Engine
 
 				if (__oldstate != m_state)
 				{
-					Debug.Log("state changed : " + m_state);
+					Debug.LogWarning("state changed : " + m_state);
 					__oldstate = m_state;
 				}
 

@@ -270,7 +270,7 @@ namespace LibSequentia.Engine
 			{
 				Debug.LogWarningFormat("transition check - m_sectionIdx : {0}, m_suppressProgress : {1}", m_sectionIdx, m_suppressProgress);
 				if(((!reverse && m_sectionIdx > 0) || (reverse && m_sectionIdx < m_track.sectionCount - 1))
-					&& !m_suppressProgress)					// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
+					&& !m_suppressProgress && !sidePlayer.isReadyOrFinished)	// 처음 섹션이 아니고 재생을 끝내는 경우도 아닐 때만
 				{
 					tinfo.transitionStart	= sidePlayer.FadeoutSection(ttype, transitionTime);
 					Debug.LogWarning("fadeout triggered");

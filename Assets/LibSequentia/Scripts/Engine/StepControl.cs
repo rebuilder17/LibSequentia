@@ -79,7 +79,7 @@ namespace LibSequentia.Engine
 			{
 				// 새 트랙이 진행중이면서 진행방향이 일치하는 경우 newStep을 사용한다. (새 트랙에 타겟팅중이므로)
 				bool usingNewStep	= ctrl.m_newTrackIsOn && reverse == ctrl.m_newTrackWasReversed;
-				Debug.Log(usingNewStep? "using newStep" : "using targetStep");
+				//Debug.Log(usingNewStep? "using newStep" : "using targetStep");
 
 				m_targetStep	= usingNewStep? newStep : targetStep;
 				m_reverse		= reverse;
@@ -268,6 +268,89 @@ namespace LibSequentia.Engine
 			}
 		}
 
+		/// <summary>
+		/// 트랙 두 개로 시작 (세이브 복원용?)
+		/// 주 : 무조건 리버스 아님
+		/// </summary>
+		class NewStartTwoTrackRequest : BaseRequest
+		{
+			// Members
+
+			Data.Track	m_curtrack;
+			int			m_curstep;
+			Data.Track	m_newtrack;
+			int			m_newstep;
+
+			Data.TransitionScenario	m_tscen;
+
+			public void Setup(Data.Track curtrack, int curstep, Data.Track newtrack, int newstep, Data.TransitionScenario tscen)
+			{
+				m_curtrack	= curtrack;
+				m_curstep	= curstep;
+				m_newtrack	= newtrack;
+				m_newstep	= newstep;
+				m_tscen		= tscen;
+			}
+
+			public NewStartTwoTrackRequest(StepControl ctrl) : base(ctrl) { }
+
+			protected override bool OnStart()
+			{
+				if (player.isPlaying)			// 재생중이면 계속 보류
+					return false;
+
+				ctrl.m_curTrackStep	= 0;		// 초기화
+				ctrl.m_newTrackStep	= 0;
+				ctrl.m_newTrackIsOn	= false;
+				ctrl.m_lastMoveWasReversed	= false;
+
+				var reverse = false;			// NOTE : 무조건 정방향 진행으로 설정한다.
+
+				// NOTE : curstep/newstep 의 자연/강제 트랜지션 여부가 따로 놀면 안될텐데... 제한하는 코드가 필요한가?
+				var curstep_next	= m_curstep + (m_curstep % 2);
+				var newstep_next	= m_newstep	+ (m_newstep % 2);
+
+				if (m_newtrack == null)				// 트랙 한개만 초기화
+				{
+					player.SetNewTrack(m_curtrack, m_tscen);
+					var handle		= player.ProgressStepTo(m_curstep, reverse);
+					handle.consumedDelegate	= () =>
+					{
+						ctrl.m_curTrackStep			= curstep_next;
+						ctrl.m_lastMoveWasReversed	= reverse;
+						ctrl.m_newTrackWasReversed	= reverse;
+						ctrl.m_newTrackIsOn			= false;
+						Debug.Log("m_curTrackStep <- nextstep (NewStartOneTrackRequest) : " + ctrl.m_curTrackStep);
+					};
+					handle.transitionDelegate = () =>
+					{
+						Debug.Log("transition over - curstep_next : " + curstep_next);
+						isComplete	= true;
+					};
+				}
+				else
+				{									// 두 트랙 초기화
+
+					player.SetBothTracks(m_curtrack, m_newtrack, m_tscen);
+					var handle		= player.ProgressStepTo(m_curstep, reverse);
+					handle.consumedDelegate = () =>
+						{
+							ctrl.m_curTrackStep			= curstep_next;
+							ctrl.m_newTrackStep			= newstep_next;
+							ctrl.m_lastMoveWasReversed	= reverse;
+							ctrl.m_newTrackWasReversed	= reverse;
+							ctrl.m_newTrackIsOn			= true;
+						};
+					handle.transitionDelegate = () =>
+						{
+							isComplete	= true;
+						};
+				}
+
+				return true;
+			}
+		}
+
 
 
 
@@ -331,7 +414,7 @@ namespace LibSequentia.Engine
 							break;
 
 						case Command.Type.StartWithTwoTrack:
-							_StartWithTwoTrack((Data.Track)cmd.param1, (int)cmd.param2, (Data.Track)cmd.param3, (Data.TransitionScenario)cmd.param4, (bool)cmd.param5);
+							_StartWithTwoTrack((Data.Track)cmd.param1, (int)cmd.param2, (Data.Track)cmd.param3, (int)cmd.param4, (Data.TransitionScenario)cmd.param5);
 							consume	= true;
 							break;
 
@@ -383,15 +466,19 @@ namespace LibSequentia.Engine
 		/// <summary>
 		/// 트랙 2개 재생 시작 (하나는 메인, 하나는 사이드)
 		/// </summary>
-		public void StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, Data.TransitionScenario transcen, bool reverse = false)
+		public void StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, int sideStep, Data.TransitionScenario transcen)
 		{
-			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StartWithTwoTrack, param1 = mainTrack, param2 = startStep, param3 = sideTrack, param4 = transcen, param5 = reverse });
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.StartWithTwoTrack, param1 = mainTrack, param2 = startStep, param3 = sideTrack, param4 = sideStep, param5 = transcen });
 		}
 
-		void _StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, Data.TransitionScenario transcen, bool reverse = false)
+		void _StartWithTwoTrack(Data.Track mainTrack, int startStep, Data.Track sideTrack, int sideStep, Data.TransitionScenario transcen)
 		{
-			
+			var newreq		= new NewStartTwoTrackRequest(this);
+			newreq.Setup(mainTrack, startStep, sideTrack, sideStep, transcen);
+			m_reqQueue.Enqueue(newreq);
 		}
+
+		//void _StartWithTwoTrack(Data.Track track, int step, Data.Track newS)
 
 		/// <summary>
 		/// 트랜지션 단계 진행
@@ -423,7 +510,7 @@ namespace LibSequentia.Engine
 		/// <returns>cmd 를 소모해야하는지 여부. true일 경우 큐에서 날린다. false일 경우 날리지 않고 다음 프레임에 계속 체크해본다</returns>
 		bool _StepMove(int step, Data.Track newTrack, Data.TransitionScenario transcen, int newstep = -1, bool reverse = false)
 		{
-			Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
+			//Debug.Log(string.Format("m_curTrackStep : {0}, step : {1}", m_curTrackStep, step));
 			if (m_curTrackStep == step)				// 동일한 step으로 진행하는 요청이 들어온 경우엔 무시한다.
 			{
 				Debug.LogWarning("same step");
