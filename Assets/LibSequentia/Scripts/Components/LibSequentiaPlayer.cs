@@ -164,9 +164,11 @@ public class LibSequentiaPlayer : MonoBehaviour, IPlayerComponent
 	{
 		for (int i = 0; i < Section.c_maxLayerPerSection; i++)
 		{
-			var source			= m_audioSources[i];
-			if (source.isPlaying)
-				source.Stop();
+			//var source			= m_audioSources[i];
+			//if (source.isPlaying)
+			//	source.Stop();
+
+			ClearAudioClip(i);
 		}
 	}
 }

@@ -305,6 +305,39 @@ namespace LibSequentia.Engine
 			return tinfo;
 		}
 
+		/// <summary>
+		/// 강제 페이드아웃 후 종료
+		/// </summary>
+		/// <returns></returns>
+		public void DoForceFadeout()
+		{
+			if (sidePlayer.isReadyOrFinished && currentPlayer.isReadyOrFinished)
+				return;
+
+			if (sidePlayer.isReadyOrFinished)	// 다른쪽 플레이어가 재생중이 아니거나 루프 종료된 경우 스위칭. 새로 재생할 플레이어가 currentPlayer가 된다
+			{
+				SwitchPlayer();
+			}
+
+			// 트랜지션 시간 구하기 - 강제 전환으로 취급한다.
+
+			double transitionTime	= CalcSectionTransitionTimeLength(m_sectionIdx, SectionPlayer.TransitionType.Manual);
+
+			if (!sidePlayer.isReadyOrFinished)
+			{
+				sidePlayer.FadeoutSection(SectionPlayer.TransitionType.Manual, transitionTime);
+			}
+
+			if (!currentPlayer.isReadyOrFinished)
+			{
+				currentPlayer.FadeoutSection(SectionPlayer.TransitionType.Manual, transitionTime);
+			}
+
+			m_curTransition	= SectionPlayer.TransitionType.None;
+		}
+
+
+
 		Coroutine m_transitionMonitor;
 
 		/// <summary>

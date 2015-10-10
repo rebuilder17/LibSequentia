@@ -95,7 +95,7 @@ namespace LibSequentia.Data
 					var count	= list.Count;
 					for (int i = 0; i < count; i++)
 					{
-						var newsec	= Section.CreateFromJSON(list[i], clipPack);
+						var newsec	= Section.CreateFromJSON(list[i], track.m_clipPack);
 						track.m_sectionSeq.Add(newsec);
 					}
 				});

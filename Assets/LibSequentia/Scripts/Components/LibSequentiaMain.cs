@@ -91,7 +91,8 @@ public class LibSequentiaMain : MonoBehaviour
 		{
 			if (s_instance == null)
 			{
-				Debug.LogError("s_instance == null");
+				var module	= GameObject.FindObjectOfType<LibSequentiaMain>();
+				module.Init();
 			}
 			return s_instance;
 		}
@@ -103,17 +104,27 @@ public class LibSequentiaMain : MonoBehaviour
 
 	void Awake()
 	{
-		s_instance			= this;
+		Init();
+	}
+
+	bool m_init	= false;
+	void Init()
+	{
+		if (!m_init)
+		{
+			m_init				= true;
+
+			s_instance			= this;
+
+			m_automationMgr		= gameObject.AddComponent<LibSequentiaAutomationManager>();
+			m_audioClipDepot	= gameObject.AddComponent<LibSequentiaAudioClipDepot>();
+
+			InitPlayer();
 
 
-		m_automationMgr		= gameObject.AddComponent<LibSequentiaAutomationManager>();
-		m_audioClipDepot	= gameObject.AddComponent<LibSequentiaAudioClipDepot>();
-
-		InitPlayer();
-
-
-		// 스텝 컨트롤러 (추가)
-		m_stepctrl			= new StepControl(m_masterplayer, this);
+			// 스텝 컨트롤러 (추가)
+			m_stepctrl			= new StepControl(m_masterplayer, this);
+		}
 	}
 
 
@@ -227,5 +238,39 @@ public class LibSequentiaMain : MonoBehaviour
 		secPlayer.SetTensionAutomationTargets(tensionCtrl);
 
 		return secPlayer;
+	}
+
+	/// <summary>
+	/// Track을 로드
+	/// </summary>
+	/// <param name="path"></param>
+	/// <returns></returns>
+	public Track LoadTrack(string path)
+	{
+		var track1json		= new JSONObject(Resources.Load<TextAsset>(path).text);
+		var clipPack		= m_audioClipDepot.LoadAndMakeAudioPack(Track.GatherRequiredClips(track1json));
+		
+		return Track.CreateFromJSON(track1json, clipPack);
+	}
+
+	/// <summary>
+	/// 트랜지션 시나리오를 로드
+	/// </summary>
+	/// <param name="path"></param>
+	/// <returns></returns>
+	public TransitionScenario LoadTransitionScenario(string path)
+	{
+		var tscenjson		= new JSONObject(Resources.Load<TextAsset>(path).text);
+
+		return TransitionScenario.CreateFromJSON(tscenjson);
+	}
+
+	/// <summary>
+	/// 강제 리셋
+	/// </summary>
+	public void Reset()
+	{
+		m_masterplayer.Reset();
+		m_stepctrl.Reset();
 	}
 }

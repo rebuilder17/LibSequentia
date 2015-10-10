@@ -31,6 +31,8 @@ namespace LibSequentia.Engine
 				CancelNewTrack,			// 새 트랙 취소하기
 
 				StepTo,					// 특정 스텝으로 이동
+
+				ForceOut,				// 강제 종료
 			}
 
 			public Type		type;
@@ -99,6 +101,8 @@ namespace LibSequentia.Engine
 			TransitionReady,			// 다른 트랙 재생 준비됨
 			OnTransition,				// 트랜지션 진행중
 			TransitionFinish,			// 트랜지션 완료
+
+			ForceOut,					// 강제 종료
 		}
 
 
@@ -144,6 +148,18 @@ namespace LibSequentia.Engine
 		Data.TransitionScenario	m_tranScenario;							// 전환 시나리오
 
 		MessageHandle			m_transitionMsgHandle;					// 트랜지션 계열의 메세지 핸들
+
+		/// <summary>
+		/// 스테이트 전부 리셋
+		/// </summary>
+		void ResetStates()
+		{
+			m_newTrackReady					= false;
+			m_cancelOngoingTrackTransition	= false;
+			m_bothTrackReady				= false;
+			m_transitionReserved			= false;
+			m_reverse						= false;
+		}
 
 
 		/// <summary>
@@ -197,7 +213,7 @@ namespace LibSequentia.Engine
 		{
 			m_state		= State.NotPlaying;
 			m_context	= context;
-			context.StartCoroutine(UpdateCo());
+			m_context.StartCoroutine(UpdateCo());
 		}
 
 		public void SetTrackPlayers(TrackPlayer p1, TrackPlayer p2)
@@ -211,6 +227,23 @@ namespace LibSequentia.Engine
 			m_trackTransCtrls[0]	= p1;
 			m_trackTransCtrls[1]	= p2;
 		}
+
+
+		/// <summary>
+		/// 즉시 정지를 멈추고 스테이트를 초기화한다.
+		/// </summary>
+		public void Reset()
+		{
+			sidePlayer.StopImmediately();
+			currentPlayer.StopImmediately();
+
+			ResetStates();
+
+			m_msgQueue.Clear();
+
+			m_state = State.NotPlaying;
+		}
+
 
 		public IMessageHandle DoNaturalProgress()
 		{
@@ -258,6 +291,15 @@ namespace LibSequentia.Engine
 				EnqueAndMakeHandle(new Message() { type = Message.Type.BothTrack, parameter = mainTrack, parameter2 = sideTrack }),
 				EnqueAndMakeHandle(new Message() { type = Message.Type.NewTransitionScenario, parameter = trans }),
 			};
+		}
+
+		/// <summary>
+		/// 강제로 페이드아웃 (종료)
+		/// </summary>
+		/// <returns></returns>
+		public IMessageHandle ForceOut()
+		{
+			return EnqueAndMakeHandle(new Message() { type = Message.Type.ForceOut });
 		}
 
 		MessageHandle EnqueAndMakeHandle(Message msg)
@@ -419,6 +461,13 @@ namespace LibSequentia.Engine
 					}
 					break;
 
+				case Message.Type.ForceOut:
+					currentPlayer.DoForceFadeout();
+					sidePlayer.DoForceFadeout();
+					m_state				= State.ForceOut;
+					consume				= true;
+					break;
+
 				default:
 					Debug.LogError("unknown message : " + msg.type);
 					consume	= true;
@@ -559,6 +608,14 @@ namespace LibSequentia.Engine
 			}
 		}
 
+		private void ProcessState_ForceOut()
+		{
+			// 정지 명령은 이미 전달되었으므로 내부 스테이트 모두 리셋
+
+			ResetStates();
+			m_state		= State.NotPlaying;
+		}
+
 		State __oldstate;
 		IEnumerator UpdateCo()
 		{
@@ -621,6 +678,10 @@ namespace LibSequentia.Engine
 
 					case State.TransitionFinish:
 						ProcessState_TransitionFinish();
+						break;
+
+					case State.ForceOut:
+						ProcessState_ForceOut();
 						break;
 				}
 

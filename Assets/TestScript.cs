@@ -24,18 +24,10 @@ public class TestScript : MonoBehaviour
 		//AudioSettings.Reset(audioSettings);
 		//
 
-		var audioClipDepot	= LibSequentiaMain.instance.clipDepot;
+		m_tracks[0]			= LibSequentiaMain.instance.LoadTrack("data/track1");
+		m_tracks[1]			= LibSequentiaMain.instance.LoadTrack("data/track2");
 
-		var track1json		= new JSONObject(Resources.Load<TextAsset>("data/track1").text);
-		var clipPack		= audioClipDepot.LoadAndMakeAudioPack(Track.GatherRequiredClips(track1json));
-		m_tracks[0]			= Track.CreateFromJSON(track1json, clipPack);
-
-		var track2json		= new JSONObject(Resources.Load<TextAsset>("data/track2").text);
-		var clipPack2		= audioClipDepot.LoadAndMakeAudioPack(Track.GatherRequiredClips(track2json));
-		m_tracks[1]			= Track.CreateFromJSON(track2json, clipPack2);
-
-		var tscenjson		= new JSONObject(Resources.Load<TextAsset>("data/ts_simpledj").text);
-		m_tscen				= TransitionScenario.CreateFromJSON(tscenjson);
+		m_tscen				= LibSequentiaMain.instance.LoadTransitionScenario("data/ts_simpledj");
 
 		LibSequentiaMain.instance.tension	= 1;
 
@@ -183,11 +175,11 @@ public class TestScript : MonoBehaviour
 			{
 				if (m_newTrackReverse)
 				{
-					ctrl.StepMove(cur.newstep, cur.newtrack, cur.tscen, cur.step, true);
+					ctrl.StepMove(cur.newstep, cur.curtrack, cur.tscen, cur.step, true);
 				}
 				else
 				{
-					ctrl.StepMove(cur.step, cur.newtrack, cur.tscen, cur.newstep, true);
+					ctrl.StepMove(cur.step, cur.curtrack, cur.tscen, cur.newstep, true);
 				}
 			}
 	
@@ -262,6 +254,22 @@ public class TestScript : MonoBehaviour
 			LibSequentiaMain.instance.songTransition	= Mathf.Min(1, LibSequentiaMain.instance.songTransition + 0.1f);
 		}
 
+		// 페이드아웃
+		if (Input.GetKeyDown(KeyCode.E))
+		{
+			LibSequentiaMain.instance.stepControl.ForceOut();
+			m_firstrun	= true;
+			m_stateidx	= -1;
+		}
+
+		// 강제 리셋
+		if(Input.GetKeyDown(KeyCode.R))
+		{
+			LibSequentiaMain.instance.Reset();
+			m_firstrun	= true;
+			m_stateidx	= -1;
+		}
+
 		if (m_firstrun)
 		{
 			int idx	= -1;
@@ -292,6 +300,7 @@ public class TestScript : MonoBehaviour
 				m_stateidx	= idx;
 				var state	= m_stateSeq[idx];
 				LibSequentiaMain.instance.stepControl.StartWithTwoTrack(state.curtrack, state.step, state.newtrack, state.newstep, state.tscen);
+				
 				m_prevState	= state;
 				m_firstrun	= false;
 			}

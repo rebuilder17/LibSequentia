@@ -494,6 +494,10 @@ namespace LibSequentia.Engine
 			isOnTransition		= true;							// 실제 트랜지션 시작
 			//Debug.Log("Natural Transition Start dspTime : " + AudioSettings.dspTime);
 
+			// NOTE : 스테이트 꼬임 방지/강제 트랜지션의 경우 트랜지션이 모든 것을 우선하므로 루프를 멈춘다.
+			// 이로 인해 문제가 생기면 다시 되돌려보고 생각한다...
+			m_context.StopCoroutine(m_updateCo);
+
 			var automation	= GetAutomation(m_sectionData.outTypeNatural);
 			while (AudioSettings.dspTime < transitionEnd)		// 루프 타이밍까지 대기, 이후 루프 종료. 음원은 알아서 끝나게 내버려둔다
 			{
@@ -511,7 +515,7 @@ namespace LibSequentia.Engine
 			//Debug.Log("Natural Transition End dspTime : " + AudioSettings.dspTime);
 
 
-			m_context.StopCoroutine(m_updateCo);
+			//m_context.StopCoroutine(m_updateCo);
 
 			m_state		= State.AfterLoop;
 		}
@@ -526,6 +530,10 @@ namespace LibSequentia.Engine
 
 			while (AudioSettings.dspTime < transitionStart)		// 트랜지션 시작 시간까지 대기
 				yield return null;
+
+			// NOTE : 스테이트 꼬임 방지/강제 트랜지션의 경우 트랜지션이 모든 것을 우선하므로 루프를 멈춘다.
+			// 이로 인해 문제가 생기면 다시 되돌려보고 생각한다...
+			m_context.StopCoroutine(m_updateCo);
 
 			isOnTransition		= true;							// 실제 트랜지션 시작
 			//Debug.Log("Manual Transition Start dspTime : " + AudioSettings.dspTime);
@@ -549,7 +557,7 @@ namespace LibSequentia.Engine
 
 			currentPlayerComponent.StopImmediately();			// 음원 바로 중지 후 루프 종료
 			
-			m_context.StopCoroutine(m_updateCo);
+			//m_context.StopCoroutine(m_updateCo);
 
 			m_state		= State.AfterLoop;
 		}

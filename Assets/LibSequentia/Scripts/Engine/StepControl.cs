@@ -307,6 +307,14 @@ namespace LibSequentia.Engine
 				var curstep_next	= m_curstep + (m_curstep % 2);
 				var newstep_next	= m_newstep	+ (m_newstep % 2);
 
+				bool directNewTrack	= m_newstep == 3;	// 바로 newtrack을 재생해야 하는 경우인지
+				if (directNewTrack)
+				{
+					m_curtrack	= m_newtrack;
+					m_curstep	= m_newstep;
+					m_newtrack	= null;
+				}
+
 				if (m_newtrack == null)				// 트랙 한개만 초기화
 				{
 					player.SetNewTrack(m_curtrack, m_tscen);
@@ -348,6 +356,25 @@ namespace LibSequentia.Engine
 			}
 		}
 
+		/// <summary>
+		/// 강제 페이드아웃 요청
+		/// </summary>
+		class ForceOutRequest : BaseRequest
+		{
+			public ForceOutRequest(StepControl ctrl) : base(ctrl) { }
+
+			protected override bool OnStart()
+			{
+				var handle		= player.ForceOut();
+				handle.consumedDelegate = () =>
+				{
+					ctrl.ResetState();
+					isComplete	= true;
+				};
+				return true;
+			}
+		}
+
 
 
 
@@ -364,6 +391,7 @@ namespace LibSequentia.Engine
 				StartWithOneTrack,
 				StartWithTwoTrack,
 				StepMove,
+				ForceOut,
 			}
 
 			public Type	type;
@@ -382,6 +410,18 @@ namespace LibSequentia.Engine
 		bool				m_newTrackIsOn;			// 새 트랙이 현재 트랜지션중인지
 		bool				m_lastMoveWasReversed;	// 가장 최근의 이동이 역방향 진행이었는지
 		bool				m_newTrackWasReversed;	// 새 트랙에 진입할 시의 reverse 상황
+
+		/// <summary>
+		/// 스테이트 리셋
+		/// </summary>
+		void ResetState()
+		{
+			m_curTrackStep	= -1;
+			m_newTrackStep	= -1;
+			m_newTrackIsOn	= false;
+			m_lastMoveWasReversed	= false;
+			m_newTrackWasReversed	= false;
+		}
 
 
 		public StepControl(MasterPlayer player, MonoBehaviour context)
@@ -419,6 +459,11 @@ namespace LibSequentia.Engine
 							consume	= _StepMove((int)cmd.param1, (Data.Track)cmd.param2, (Data.TransitionScenario)cmd.param3, (int)cmd.param4, (bool)cmd.param5);
 							break;
 
+						case Command.Type.ForceOut:
+							_ForceOut();
+							consume	= true;
+							break;
+
 						default:
 							throw new System.InvalidOperationException("unknown command type " + cmd.type);
 					}
@@ -442,6 +487,16 @@ namespace LibSequentia.Engine
 			}
 		}
 
+
+		/// <summary>
+		/// 리셋
+		/// </summary>
+		public void Reset()
+		{
+			ResetState();
+			m_cmdQueue.Clear();
+			m_reqQueue.Clear();
+		}
 
 
 		/// <summary>
@@ -536,6 +591,17 @@ namespace LibSequentia.Engine
 			{									// stepmove가 맞긴 맞는데 위 moveoncemore 를 실패한 경우라면, 이 명령은 소모해서는 안됨
 				return false;
 			}
+		}
+
+		public void ForceOut()
+		{
+			m_cmdQueue.Enqueue(new Command() { type = Command.Type.ForceOut });
+		}
+
+		void _ForceOut()
+		{
+			var newreq		= new ForceOutRequest(this);
+			m_reqQueue.Enqueue(newreq);
 		}
 	}
 }
