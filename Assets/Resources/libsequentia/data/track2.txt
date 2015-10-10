@@ -11,17 +11,17 @@
 			"manual-out"	:"FadeOut",
 			
 			"beat-fillin"	:0,
-			"beat-start"	:4,
-			"beat-end"		:36,
+			"beat-start"	:2,
+			"beat-end"		:34,
 			
 			"layers":
 			[
 				{
-					"clip"		:"test-sec1-1"
+					"clip"		:"libsequentia/test2-sec1-1"
 				},
 				
 				{
-					"clip"		:"test-sec1-2",
+					"clip"		:"libsequentia/test2-sec1-2",
 					"tension":
 					[
 						{
@@ -37,7 +37,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec1-3",
+					"clip"		:"libsequentia/test2-sec1-3",
 					"tension":
 					[
 						{
@@ -52,7 +52,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec1-4",
+					"clip"		:"libsequentia/test2-sec1-4",
 					"tension":
 					[
 						{
@@ -77,17 +77,17 @@
 			"manual-out"	:"FadeOut",
 			
 			"beat-fillin"	:0,
-			"beat-start"	:4,
-			"beat-end"		:36,
+			"beat-start"	:1,
+			"beat-end"		:33,
 			
 			"layers":
 			[
 				{
-					"clip"		:"test-sec2-1"
+					"clip"		:"libsequentia/test2-sec2-1"
 				},
 				
 				{
-					"clip"		:"test-sec2-2",
+					"clip"		:"libsequentia/test2-sec2-2",
 					"tension":
 					[
 						{
@@ -103,7 +103,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec2-3",
+					"clip"		:"libsequentia/test2-sec2-3",
 					"tension":
 					[
 						{
@@ -118,7 +118,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec2-4",
+					"clip"		:"libsequentia/test2-sec2-4",
 					"tension":
 					[
 						{
@@ -143,17 +143,17 @@
 			"manual-out"	:"FadeOut",
 			
 			"beat-fillin"	:0,
-			"beat-start"	:4,
-			"beat-end"		:36,
+			"beat-start"	:2,
+			"beat-end"		:34,
 			
 			"layers":
 			[
 				{
-					"clip"		:"test-sec1-1"
+					"clip"		:"libsequentia/test2-sec1-1"
 				},
 				
 				{
-					"clip"		:"test-sec1-2",
+					"clip"		:"libsequentia/test2-sec1-2",
 					"tension":
 					[
 						{
@@ -169,7 +169,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec1-3",
+					"clip"		:"libsequentia/test2-sec1-3",
 					"tension":
 					[
 						{
@@ -184,7 +184,7 @@
 				},
 				
 				{
-					"clip"		:"test-sec1-4",
+					"clip"		:"libsequentia/test2-sec1-4",
 					"tension":
 					[
 						{

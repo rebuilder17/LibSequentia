@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using LibSequentia.Engine;
 using LibSequentia.Data;
 
-public class TestScript : MonoBehaviour
+public class LibSeqTestScript : MonoBehaviour
 {
 	float							m_tension	= 0;
 
@@ -24,10 +24,10 @@ public class TestScript : MonoBehaviour
 		//AudioSettings.Reset(audioSettings);
 		//
 
-		m_tracks[0]			= LibSequentiaMain.instance.LoadTrack("data/track1");
-		m_tracks[1]			= LibSequentiaMain.instance.LoadTrack("data/track2");
+		m_tracks[0]			= LibSequentiaMain.instance.LoadTrack("libsequentia/data/track1");
+		m_tracks[1]			= LibSequentiaMain.instance.LoadTrack("libsequentia/data/track2");
 
-		m_tscen				= LibSequentiaMain.instance.LoadTransitionScenario("data/ts_simpledj");
+		m_tscen				= LibSequentiaMain.instance.LoadTransitionScenario("libsequentia/data/ts_simpledj");
 
 		LibSequentiaMain.instance.tension	= 1;
 
